@@ -1,3 +1,4 @@
+from commons.loggers import Logger
 from commons.settings import MASTER_ADDR
 from commons.utils import rpc_call
 
@@ -27,16 +28,15 @@ def create(path, c):
     master_server = rpc_call(c.master_addr)
     resp, err = master_server.create(path)
     if resp:
-        # TODO: use logging.debug, error etc instead of print
-        print("File created successfully")
+        logging.debug("Create API response %s", resp)
     else:
-        print("Error creating file", path, err)
+        logging.error("Error creating file '%s'. Why? : %s", path, err)
 
 
 if __name__ == "__main__":
     client = get_instance(MASTER_ADDR)
 
-    # print('Server test:', server.test_ok())
-    print("Client:", client)
+    logging = Logger.get_default_logger()
+    logging.info("Client: %s", client)
 
     create('a', client)
