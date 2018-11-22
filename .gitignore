@@ -213,3 +213,6 @@ pip-selfcheck.json
 
 # Custom additions
 .idea
+
+#VScode workspace settings
+.vscode
