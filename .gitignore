@@ -213,3 +213,6 @@ pip-selfcheck.json
 
 # Custom additions
 .idea
+
+# metadata files
+master_metadata.txt

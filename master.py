@@ -4,17 +4,18 @@ from xmlrpc.server import SimpleXMLRPCServer
 from numpy import uint64
 
 from commons.loggers import Logger
-from commons.settings import MASTER_PORT, MASTER_HOST, MASTER_ADDR
+from commons.settings import MASTER_ADDR, MASTER_PORT, MASTER_HOST
 
 
 class Master:
-    __slots__ = 'client_id_counter', 'chunk_handle', 'mutex', 'meta_file'
+    __slots__ = 'my_addr', 'client_id', 'chunk_handle', 'mutex', 'metadata_file'
 
     def __init__(self):
-        self.client_id_counter = 0
-        self.chunk_handle = uint64(0)
+        self.my_addr = MASTER_ADDR
+        self.client_id = 0  # counter to give next client ID
+        self.chunk_handle = uint64(0)  # counter to give next chunk handle ID
         self.mutex = threading.Lock()  # TODO: probably use a re entrant lock
-        self.meta_file = f'master_meta{MASTER_ADDR}'
+        self.metadata_file = 'master_metadata.txt'  # File that contains masters metadata
 
     def test_ok(self):
         """A quick test to see if server is working fine"""
@@ -25,22 +26,53 @@ class Master:
         When a client is attached to the master,
         it calls this function to get a unique client ID.
         """
-        logging.info("UNIQUE_CLIENT_ID API called")
+        req_logging.info("UNIQUE_CLIENT_ID API called")
 
         with self.mutex:
-            self.client_id_counter += 1
-            return self.client_id_counter
-            # todo: Update master's meta data file
+            self.client_id += 1
+
+            # make client id persistent in metadata file
+            update_metadata(self)
+
+            return self.client_id
 
     def create(self, path):
         """Will be called by client to create a file in the namespace"""
-        logging.info("CREATE API called")
+        req_logging.info("CREATE API called")
         # TODO: implement
         return False, "Not Implemented yet"
 
 
-if __name__ == '__main__':
-    logging = Logger.get_request_logger()
+def update_metadata(m: Master):
+    # TODO:
+    #  - Maintain meta data as an in memory object
+    #  - Find a way to dump entire meta data object
+    with open(m.metadata_file, mode="w") as fp:
+        fp.write(f"client_id {m.client_id}\n")
+
+
+def parse_metadata(m: Master, fp):
+    # TODO: Load entire metadata object into memory
+    key, value = fp.readline().split()
+    if key == "client_id":
+        m.client_id = int(value)
+    else:
+        logging.error('Invalid master meta data key: %s with value: %s', key, value)
+
+
+def load_metadata(m: Master):
+    try:
+        with open(m.metadata_file) as fp:
+            parse_metadata(m, fp)
+    except FileNotFoundError:
+        logging.debug("Can't open meta data file: %s", m.metadata_file)
+
+
+def start_master():
+    m = Master()
+
+    # restore previous launch's meta data
+    load_metadata(m)
 
     master_server = SimpleXMLRPCServer((MASTER_HOST, MASTER_PORT),
                                        logRequests=True,
@@ -52,6 +84,15 @@ if __name__ == '__main__':
     # register all methods to be available to client
     # can either use register_function(<function's_name>)
     # or register_instance(<class's_instance>)  # All the methods of the instance are published as XML-RPC methods
-    master_server.register_instance(Master())
+    master_server.register_instance(m)
 
     master_server.serve_forever()
+
+    # TODO: launch background tasks (eg. gc, heartbeat) in a separate thread
+
+
+if __name__ == '__main__':
+    req_logging = Logger.get_request_logger()
+    logging = Logger.get_default_logger()
+
+    start_master()
