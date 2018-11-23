@@ -5,13 +5,14 @@ from numpy import uint64
 
 from commons.loggers import Logger
 from commons.settings import MASTER_ADDR, MASTER_PORT, MASTER_HOST
+from master.chunk_manager import ChunkManager
 from master.metadata_manager import load_metadata, update_metadata
 from master.namespace_manager import NamespaceManager
 
 
 class Master:
     __slots__ = 'my_addr', 'client_id', 'chunk_handle', 'mutex', \
-                'metadata_file', 'namespace_manager'
+                'metadata_file', 'namespace_manager', 'chunk_manager'
 
     def __init__(self):
         self.my_addr = MASTER_ADDR
@@ -21,6 +22,9 @@ class Master:
         self.metadata_file = 'master_metadata.txt'  # File that contains masters metadata
 
         self.namespace_manager = NamespaceManager()
+        self.chunk_manager = ChunkManager()
+
+        # self.chunk_servers = []
 
     def test_ok(self):
         """A quick test to see if server is working fine"""
@@ -46,6 +50,15 @@ class Master:
         req_logging.info("CREATE API called")
         res, err = self.namespace_manager.create(path)
         return res, err
+
+    def add_chunk(self, path, chunk_index):
+        pass
+
+    def find_locations(self, path, chunk_index):
+        """Returns chunk handle and an array of chunk locations for a given file name and chunk index"""
+        chunk_handle, chunk_locations, err = self.chunk_manager.find_locations(path, chunk_index)
+
+        return chunk_handle, chunk_locations, err
 
 
 def start_master():
