@@ -5,6 +5,7 @@ from numpy import uint64
 
 from commons.loggers import Logger
 from commons.settings import MASTER_ADDR, MASTER_PORT, MASTER_HOST
+from master.metadata_manager import load_metadata, update_metadata
 from master.namespace_manager import NamespaceManager
 
 
@@ -45,31 +46,6 @@ class Master:
         req_logging.info("CREATE API called")
         res, err = self.namespace_manager.create(path)
         return res, err
-
-
-def update_metadata(m: Master):
-    # TODO:
-    #  - Maintain meta data as an in memory object
-    #  - Find a way to dump entire meta data object
-    with open(m.metadata_file, mode="w") as fp:
-        fp.write(f"client_id {m.client_id}\n")
-
-
-def parse_metadata(m: Master, fp):
-    # TODO: Load entire metadata object into memory
-    key, value = fp.readline().split()
-    if key == "client_id":
-        m.client_id = int(value)
-    else:
-        logging.error('Invalid master meta data key: %s with value: %s', key, value)
-
-
-def load_metadata(m: Master):
-    try:
-        with open(m.metadata_file) as fp:
-            parse_metadata(m, fp)
-    except FileNotFoundError:
-        logging.debug("Can't open meta data file: %s", m.metadata_file)
 
 
 def start_master():
