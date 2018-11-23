@@ -2,6 +2,6 @@
 Custom errors are defined in this file.
 """
 
-
-class PathError(Exception):
-    pass
+PathNotFoundErr = "Path does not exist."
+ParentIsNotDirErr = "Parent is not a directory"
+FileAlreadyExistsErr = "File already exists"

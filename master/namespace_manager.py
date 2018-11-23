@@ -1,6 +1,8 @@
 import threading
 from typing import Dict
 
+from commons.errors import *
+
 
 class Path:
     is_dir: bool
@@ -28,13 +30,13 @@ class NamespaceManager:
         with self.mutex:
             parent = get_parent(path)
             if not self.exists(parent):
-                return False, "Path does not exist."
+                return False, PathNotFoundErr
 
             if not self.is_dir(parent):
-                return False, "Parent is not a directory."
+                return False, ParentIsNotDirErr
 
             if self.exists(path):
-                return False, "File already exists"
+                return False, FileAlreadyExistsErr
 
             self.paths[path] = Path(False, 0)
 
