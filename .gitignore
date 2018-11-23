@@ -214,7 +214,8 @@ pip-selfcheck.json
 # Custom additions
 .idea
 
-
 #VScode workspace settings
 .vscode
 
+# ignore metadata and log files
+master_metadata.txt
