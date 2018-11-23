@@ -5,10 +5,12 @@ from numpy import uint64
 
 from commons.loggers import Logger
 from commons.settings import MASTER_ADDR, MASTER_PORT, MASTER_HOST
+from master.namespace_manager import NamespaceManager
 
 
 class Master:
-    __slots__ = 'my_addr', 'client_id', 'chunk_handle', 'mutex', 'metadata_file'
+    __slots__ = 'my_addr', 'client_id', 'chunk_handle', 'mutex', \
+                'metadata_file', 'namespace_manager'
 
     def __init__(self):
         self.my_addr = MASTER_ADDR
@@ -16,6 +18,8 @@ class Master:
         self.chunk_handle = uint64(0)  # counter to give next chunk handle ID
         self.mutex = threading.Lock()  # TODO: probably use a re entrant lock
         self.metadata_file = 'master_metadata.txt'  # File that contains masters metadata
+
+        self.namespace_manager = NamespaceManager()
 
     def test_ok(self):
         """A quick test to see if server is working fine"""
@@ -39,8 +43,8 @@ class Master:
     def create(self, path):
         """Will be called by client to create a file in the namespace"""
         req_logging.info("CREATE API called")
-        # TODO: implement
-        return False, "Not Implemented yet"
+        res, err = self.namespace_manager.create(path)
+        return res, err
 
 
 def update_metadata(m: Master):
