@@ -2,7 +2,7 @@ import random
 import threading
 import time
 from threading import Lock
-from typing import List, Dict
+from typing import List, Dict, Set
 
 from commons.errors import FileNotFoundErr, ChunkAlreadyExistsErr, ChunkhandleDoesNotExistErr, NoChunkServerAliveErr, \
     ChunkHandleNotFoundErr
@@ -61,7 +61,7 @@ class ChunkManager:
     chunks: Dict[str, Dict[int, Chunk]]
     handles: Dict[int, PathIndex]
     locations: Dict[int, ChunkInfo]
-    chunk_servers: List[str]
+    chunk_servers: Set[str]
     leases: Dict[int, Lease]
 
     __slots__ = 'lock', 'chunk_handle', 'chunks', 'handles', 'locations', 'chunk_servers', 'leases'
@@ -77,7 +77,7 @@ class ChunkManager:
         # chunk handle -> chunk locations (in-memory)
         self.locations = {}
         # a list if chunk servers
-        self.chunk_servers = ['http://127.0.0.1:9010']
+        self.chunk_servers = set()
         #  chunk handle -> lease
         self.leases = {}
 
