@@ -141,8 +141,7 @@ class ChunkServer:
             if address != self.my_addr:
                 cs = rpc_call(address)
                 err = cs.serialized_write(client_id, timestamp, path, chunk_index, chunk_handle, offset,
-                                          chunk_locations,
-                                          append_mode=False)
+                                          chunk_locations, False)
                 if err:
                     return err
         return None
