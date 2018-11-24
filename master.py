@@ -112,21 +112,25 @@ class Master:
         # FIXME: path_index looks unnecessary :/
         path_index, err = self.chunk_manager.get_path_index_from_handle(chunk_handle)
 
-        assert path_index.index == chunk_index
-
         if err:
             return None, err
+
+        assert path_index.index == chunk_index
+
         self.chunk_manager.set_chunk_location(chunk_handle, server)
 
-        # Update file information
+        # Update file size information
         file_length, err = self.namespace_manager.get_file_length(path_index.path)
-        calculated = CHUNK_SIZE * path_index.index + length
 
-        log.debug("Result: %s, index: %s, length: %s", calculated, path_index.index, length)
+        new_length = CHUNK_SIZE * path_index.index + length
 
-        if calculated > file_length:
-            self.namespace_manager.set_file_length(path_index.path, calculated)
-            log.debug("New length %s", calculated)
+        log.debug(f"new calculated file size= {new_length},  "
+                  f"old_file_size={file_length}, "
+                  f"this chunk's size={length}, "
+                  f"chunk index={path_index.index}")
+
+        if new_length > file_length:
+            self.namespace_manager.set_file_length(path_index.path, new_length)
 
         return None
 
