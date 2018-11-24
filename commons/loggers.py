@@ -1,40 +1,23 @@
 # Define custom Loggers
 import logging
 
-
-# TODO: simplify it's too complicated
-
-class Logger:
-    @staticmethod
-    def get_request_logger():
-        logger = logging.getLogger(LogTypes.REQUEST_LOGGER)
-        logger.setLevel(logging.DEBUG)
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
-        formatter = logging.Formatter(LogFormats.REQUEST_FORMAT)
-        ch.setFormatter(formatter)
-        logger.addHandler(ch)
-        return logger
-
-    @staticmethod
-    def get_default_logger():
-        logger = logging.getLogger(LogTypes.DEFAULT_LOGGER)
-        logger.setLevel(logging.DEBUG)
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
-        formatter = logging.Formatter(LogFormats.DEFAULT_FORMAT)
-        ch.setFormatter(formatter)
-        logger.addHandler(ch)
-        return logger
+default_formatter = logging.Formatter('[%(filename)s %(funcName)s] - [%(levelname)s] - %(message)s')
+request_formatter = logging.Formatter('%(asctime)s - [%(filename)s %(funcName)s RPC] - [%(levelname)s] - %(message)s')
+thread_formatter = logging.Formatter('%(asctime)s - [%(thread)d %(threadName)s] - [%(levelname)s] - %(message)s')
 
 
-class LogFormats:
-    DEFAULT_FORMAT = '[%(filename)s %(funcName)s] - [%(levelname)s] - %(message)s'
-    REQUEST_FORMAT = '%(asctime)s - [%(filename)s %(funcName)s] - [%(levelname)s] - %(message)s'
-    THREAD_FORMAT = '%(asctime)s - [%(thread)d %(threadName)s] - [%(levelname)s] - %(message)s'
+def setup_logger(name, formatter, level=logging.DEBUG):
+    """Function setup as many loggers as you want"""
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(formatter)
+
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    logger.addHandler(handler)
+
+    return logger
 
 
-class LogTypes:
-    REQUEST_LOGGER = "REQUEST_LOGGER"
-    DEFAULT_LOGGER = "DEFAULT_LOGGER"
-    THREAD_LOGGER = "DEFAULT_LOGGER"
+default_logger = setup_logger('default_logger', default_formatter)
+request_logger = setup_logger('request_logger', request_formatter)

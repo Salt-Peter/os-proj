@@ -5,8 +5,7 @@ from typing import List, Dict
 
 from commons.errors import FileNotFoundErr, ChunkAlreadyExistsErr, ChunkhandleDoesNotExistErr, NoChunkServerAliveErr, \
     ChunkHandleNotFoundErr
-from commons.loggers import Logger
-from commons.settings import REPLICATION_FACTOR
+from commons.loggers import default_logger
 
 LEASE_TIMEOUT = 60  # expires in 1 minute
 
@@ -185,7 +184,6 @@ class ChunkManager:
             return NoChunkServerAliveErr
 
         #  Assign new values to lease.
-        import random
         # TODO: pick primary randomly
         # lease.primary = locations.locations[random.randint(0, REPLICATION_FACTOR - 1)]
         lease.primary = locations.locations[0]
@@ -215,4 +213,4 @@ class ChunkManager:
             info.locations.append(address)
 
 
-log = Logger.get_default_logger()
+log = default_logger

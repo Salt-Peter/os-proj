@@ -4,7 +4,7 @@ from xmlrpc.server import SimpleXMLRPCServer
 
 from commons.datastructures import ChunkInfo
 from commons.errors import FileNotFoundErr
-from commons.loggers import Logger
+from commons.loggers import request_logger
 from commons.settings import MASTER_ADDR
 from commons.utils import rpc_call
 
@@ -213,5 +213,5 @@ def start_chunkserver(master_addr, my_ip, my_port, path):
 
 
 if __name__ == '__main__':
-    log = Logger.get_request_logger()
+    log = request_logger
     start_chunkserver(MASTER_ADDR, "127.0.0.1", 9010, "temp/ck1")

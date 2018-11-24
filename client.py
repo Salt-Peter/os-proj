@@ -1,9 +1,9 @@
+import random
 import time
 
 from commons.datastructures import DataId
-import random
 from commons.errors import ChunkAlreadyExistsErr
-from commons.loggers import Logger
+from commons.loggers import default_logger
 from commons.settings import MASTER_ADDR, CHUNK_SIZE
 from commons.utils import rpc_call
 
@@ -31,9 +31,9 @@ class Client:
         master_server = rpc_call(self.master_addr)
         resp, err = master_server.create(path)
         if resp:
-            logging.debug("Create API response %s", resp)
+            log.debug("Create API response %s", resp)
         else:
-            logging.error("Error creating file '%s'. Why? : %s", path, err)
+            log.error("Error creating file '%s'. Why? : %s", path, err)
 
     def write(self, path, offset, data):
         length = len(data)
@@ -90,7 +90,7 @@ class Client:
         # Push data to all replicas' memory.
         err = self.push_data(chunk_locations, data_id, data)
         if err:
-            logging.error('Data not pushed to all replicas.')
+            log.error('Data not pushed to all replicas.')
             return False
 
         # Once data is pushed to all replicas, send write request to the primary replica.
@@ -98,7 +98,7 @@ class Client:
         primary = self.find_lease_holder(chunk_handle)
 
         if not primary:
-            logging.error("Primary chunk server not found.")
+            log.error("Primary chunk server not found.")
             return False
 
         primary_cs = rpc_call(primary)
@@ -188,7 +188,7 @@ class Client:
         get total length of the file"""
         master_server = rpc_call(self.master_addr)
         filelength, err = master_server.get_filelength(path)
-        logging.debug("%s length is: %s", path, filelength)
+        log.debug("%s length is: %s", path, filelength)
         return filelength, err
 
     # read a file
@@ -216,7 +216,7 @@ class Client:
                         length = rem
                 chunkdata, err = self.read_helper(path, i, startoffset, length)
                 if err:
-                    logging.debug("Unable to read required data, Error while reading chunkindex %s: %s", i, err)
+                    log.debug("Unable to read required data, Error while reading chunkindex %s: %s", i, err)
                     return err
                 else:
                     file.write(chunkdata)
@@ -240,36 +240,36 @@ class Client:
         master_server = rpc_call(self.master_addr)
         resp, err = master_server.create_dir(path)
         if resp:
-            logging.debug("Create Dir API response %s", resp)
+            log.debug("Create Dir API response %s", resp)
         else:
-            logging.error("Error creating file '%s'. Why? : %s", path, err)
+            log.error("Error creating file '%s'. Why? : %s", path, err)
 
     # list all files in a directory
     def list(self, path):
         master_server = rpc_call(self.master_addr)
         resp, err = master_server.list(path)
         if resp:
-            logging.debug("List of files in %s:\n", path)
+            log.debug("List of files in %s:\n", path)
             for file in resp:
-                logging.debug("%s\n", file)
+                log.debug("%s\n", file)
         else:
-            logging.error("Error creating file '%s'. Why? : %s", path, err)
+            log.error("Error creating file '%s'. Why? : %s", path, err)
 
     # remove file
     def delete(self, path):
         master_server = rpc_call(self.master_addr)
         err = master_server.delete(path)
         if err:
-            logging.error("Error while deleting %s : %s", path, err)
+            log.error("Error while deleting %s : %s", path, err)
         else:
-            logging.info("File Deleted Successfully")
+            log.info("File Deleted Successfully")
 
 
 if __name__ == "__main__":
     client = Client(MASTER_ADDR)
 
-    logging = Logger.get_default_logger()
-    logging.info("Client: %s", client)
+    log = default_logger
+    log.info("Client: %s", client)
 
     client.create('a')
     client.write('a', 0, "Apple")

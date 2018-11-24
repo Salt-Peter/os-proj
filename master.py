@@ -1,7 +1,7 @@
 import threading
 from xmlrpc.server import SimpleXMLRPCServer
 
-from commons.loggers import Logger
+from commons.loggers import default_logger, request_logger
 from commons.settings import MASTER_ADDR, MASTER_PORT, MASTER_HOST, CHUNK_SIZE
 from master.chunk_manager import ChunkManager
 from master.metadata_manager import load_metadata, update_metadata
@@ -33,7 +33,7 @@ class Master:
         When a client is attached to the master,
         it calls this function to get a unique client ID.
         """
-        req_logging.info("UNIQUE_CLIENT_ID API called")
+        rlog.info("Granting client id=%d", self.client_id + 1)
 
         with self.mutex:
             self.client_id += 1
@@ -46,20 +46,21 @@ class Master:
     def create(self, path):
         """Will be called by client to create a file in the namespace"""
         req_logging.info("CREATE API called")
+        rlog.info("args: path=%s", path)
         res, err = self.namespace_manager.create(path)
         return res, err
 
     def add_chunk(self, path, chunk_index):
-        req_logging.info("ADD CHUNK API called")
+        rlog.info("args: path=%s, chunk_index=%d", path, chunk_index)
         info, err = self.chunk_manager.add_chunk(path, chunk_index)
         if err:
             return None, None, err
 
-        print("HERE", info, type(info))
         return info.chunk_handle, info.locations, None
 
     def find_locations(self, path, chunk_index):
         """Returns chunk handle and an array of chunk locations for a given file name and chunk index"""
+        rlog.info("args: path=%s, chunk_index=%d", path, chunk_index)
         chunk_info, err = self.chunk_manager.find_locations(path, chunk_index)
 
         return chunk_info, err
@@ -69,7 +70,7 @@ class Master:
     # // automatically select one of the replicas to be the primary, and grant lease
     # // to that primary.
     def find_lease_holder(self, chunk_handle):
-        req_logging.info("chunk_handle: %s", chunk_handle)
+        rlog.info("args: chunk_handle=%d", chunk_handle)
         lease, err = self.chunk_manager.find_lease_holder(chunk_handle)
         if err:
             return None, None, err
@@ -80,7 +81,7 @@ class Master:
     # // they have a certain chunk and the number of defined bytes in
     # // the chunk.
     def report_chunk(self, server, chunk_handle, chunk_index, length, path):
-        req_logging.debug("Report chunk called")
+        rlog.debug("Report chunk called")
         path_index, err = self.chunk_manager.get_path_index_from_handle(chunk_handle)
         if err:
             return None, err
@@ -89,28 +90,28 @@ class Master:
         #   // Update file information
         file_length, err = self.namespace_manager.get_file_length(path_index.path)
         calculated = CHUNK_SIZE * path_index.index + length
-        logging.debug("Result: %s, index: %s, length: %s", calculated, path_index.index, length)
+        log.debug("Result: %s, index: %s, length: %s", calculated, path_index.index, length)
         if calculated > file_length:
             self.namespace_manager.set_file_length(path_index.path, calculated)
-            logging.debug("New length", calculated)
+            log.debug("New length %s", calculated)
 
         return None
 
     def create_dir(self, path):
         """Will be called by client to create a dir in the namespace"""
-        req_logging.info("CREATE DIR API called")
+        rlog.info("CREATE DIR API called")
         res, err = self.namespace_manager.create_dir(path)
         return res, err
 
     def list(self, path):
         """Will be called by client to list all files present in given directory path"""
-        req_logging.info("LIST FILES API called")
+        rlog.info("LIST FILES API called")
         res, err = self.namespace_manager.list(path)
         return res, err
 
     def delete(self, path):
         """Will be called by client to delete a specific file"""
-        req_logging.info("DELETE FILE API called")
+        rlog.info("DELETE FILE API called")
         err = self.namespace_manager.delete(path)
         return err
 
@@ -139,7 +140,7 @@ def start_master():
 
 
 if __name__ == '__main__':
-    req_logging = Logger.get_request_logger()
-    logging = Logger.get_default_logger()
+    log = default_logger
+    rlog = request_logger
 
     start_master()

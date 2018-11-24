@@ -1,6 +1,6 @@
-from commons.loggers import Logger
+from commons.loggers import default_logger
 
-logging = Logger.get_default_logger()
+log = default_logger
 
 
 def update_metadata(master):
@@ -17,7 +17,7 @@ def parse_metadata(master, fp):
     if key == "client_id":
         master.client_id = int(value)
     else:
-        logging.error('Invalid master meta data key: %s with value: %s', key, value)
+        log.error('Invalid master meta data key: %s with value: %s', key, value)
 
 
 def load_metadata(master):
@@ -25,4 +25,4 @@ def load_metadata(master):
         with open(master.metadata_file) as fp:
             parse_metadata(master, fp)
     except FileNotFoundError:
-        logging.debug("Can't open meta data file: %s", master.metadata_file)
+        log.debug("Can't open meta data file: %s", master.metadata_file)
