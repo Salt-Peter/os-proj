@@ -75,9 +75,9 @@ class Master:
         :return: chunk_info {chunk_handle, chunk_locations} and errors.
         """
         rlog.info("args: path=%s, chunk_index=%d", path, chunk_index)
-        chunk_info, err = self.chunk_manager.find_locations(path, chunk_index)
+        chunk_locations, chunk_handle, err = self.chunk_manager.find_locations(path, chunk_index)
 
-        return chunk_info, err
+        return chunk_locations, chunk_handle, err
 
     def find_lease_holder(self, chunk_handle):
         """
@@ -122,9 +122,6 @@ class Master:
         file_length, err = self.namespace_manager.get_file_length(path_index.path)
         calculated = CHUNK_SIZE * path_index.index + length
 
-        import ipdb
-        ipdb.set_trace()
-
         log.debug("Result: %s, index: %s, length: %s", calculated, path_index.index, length)
 
         if calculated > file_length:
@@ -150,6 +147,12 @@ class Master:
         rlog.info("DELETE FILE API called")
         err = self.namespace_manager.delete(path)
         return err
+
+    def get_file_length(self, path):
+        """Will be called by client to get the file length"""
+        rlog.info("GET FILE LENGTH API Called")
+        file_length, err = self.namespace_manager.get_file_length(path)
+        return file_length, err
 
 
 def start_master():
