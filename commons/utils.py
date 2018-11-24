@@ -10,18 +10,11 @@ def rpc_call(server_addr):
                                      allow_none=True)
 
 
-# randomly picks n random elements from array arr
-def pick_randomly(arr, n):
-    # TODO: implement random sampling methods like reservoir sampling
-    res = []
+# randomly picks n random elements from given sequence
+def pick_randomly(seq, n):
     import random
-    perm = list(range(len(arr)))
-    random.shuffle(perm)
-
-    for i in range(min(n, len(arr))):
-        res.append(arr[perm[i]])
-
-    return res
+    return random.sample(seq,
+                         min(len(seq), n))
 
 
 def get_cache(timeout=60, maxsize=10):
