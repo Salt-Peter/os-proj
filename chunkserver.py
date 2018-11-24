@@ -1,3 +1,4 @@
+import sys
 import threading
 from typing import Dict, List
 from xmlrpc.server import SimpleXMLRPCServer
@@ -219,4 +220,5 @@ def start_chunkserver(master_addr, my_ip, my_port, path):
 
 if __name__ == '__main__':
     log = request_logger
-    start_chunkserver(MASTER_ADDR, "127.0.0.1", 9010, "temp/ck1")
+    port = int(sys.argv[1])
+    start_chunkserver(MASTER_ADDR, "127.0.0.1", port, f"temp/ck{port}")
