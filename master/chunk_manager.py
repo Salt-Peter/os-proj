@@ -81,8 +81,8 @@ class ChunkManager:
 
     def find_locations(self, path, chunk_index):
         with self.lock:
-            chunk_info, err = self.get_chunk_info(path, chunk_index)
-            return chunk_info, err
+            chunk_locations, chunk_handle, err = self.get_chunk_info(path, chunk_index)
+            return chunk_locations, chunk_handle, err
 
     # Assumes lock is acquired
     # Get chunk information associated with a file and a chunk index.
@@ -91,19 +91,19 @@ class ChunkManager:
         value = self.chunks.get(path, None)
         if not value:
             log.debug(FileNotFoundErr)
-            return None, FileNotFoundErr
+            return None, None, FileNotFoundErr
 
         chunk = value.get(chunk_index, None)
         if not chunk:
             log.debug("Chunk index not found.")
-            return None, "Chunk index not found."
+            return None, None, "Chunk index not found."
 
         chunk_info = self.locations.get(chunk.chunk_handle, None)
         if not chunk_info:
             log.debug("Locations not found.")
-            return None, "Locations not found"
+            return None, None, "Locations not found"
 
-        return chunk_info, None
+        return chunk_info.locations, chunk_info.chunk_handle, None
 
     def add_chunk(self, path, chunk_index):
         with self.lock:

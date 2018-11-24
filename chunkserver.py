@@ -181,10 +181,12 @@ class ChunkServer:
     def read(self, chunk_handle, offset, length):
         """Called by client to read data from specific chunk"""
         # open file to read data
+        log.debug("CHUNK SERVER READ CALLED")
         try:
-            with open(self.path + "/" + chunk_handle, "rb") as file:
+            with open(f'{self.path}/{chunk_handle}', 'rb') as file:
                 file.seek(int(offset))  # goes to specific offset in a chunk
                 filecontent = file.read(length)  # read all required content in filecontent
+                log.debug("FileContent %s", filecontent)
                 return filecontent, None
         except Exception as err:
             return None, err

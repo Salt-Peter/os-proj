@@ -60,9 +60,9 @@ class Master:
 
     def find_locations(self, path, chunk_index):
         """Returns chunk handle and an array of chunk locations for a given file name and chunk index"""
-        chunk_info, err = self.chunk_manager.find_locations(path, chunk_index)
+        chunk_locations, chunk_handle, err = self.chunk_manager.find_locations(path, chunk_index)
 
-        return chunk_info, err
+        return chunk_locations, chunk_handle, err
 
     # // FindLeaseHolder replies to client RPC to get the primary chunkserver for a
     # // given chunkhandle. If there is no current lease holder, chunkManager will
@@ -113,6 +113,12 @@ class Master:
         req_logging.info("DELETE FILE API called")
         err = self.namespace_manager.delete(path)
         return err
+
+    def get_file_length(self, path):
+        """Will be called by client to get the file length"""
+        req_logging.info("GET FILE LENGTH API Called")
+        file_length, err = self.namespace_manager.get_file_length(path)
+        return file_length, err
 
 
 def start_master():

@@ -9,6 +9,9 @@ from commons.utils import rpc_call
 
 
 # data structure for client
+from master.chunk_manager import ChunkInfo
+
+
 class Client:
     # Read: https://docs.python.org/3/reference/datamodel.html#slots
     __slots__ = 'client_id', 'master_addr', 'location_cache', 'lease_holder_cache'
@@ -139,12 +142,13 @@ class Client:
 
         # else: not found in cache, get from master server
         ms = rpc_call(self.master_addr)
-        resp, err = ms.find_locations(path, chunk_index)
+        chunk_locations, chunk_handle,  err = ms.find_locations(path, chunk_index)
 
         if not err:
             # Save into location cache
-            self.location_cache[key] = resp
-            return resp.chunk_handle, resp.locations, err
+            chunk_info = ChunkInfo(chunk_handle,chunk_locations)
+            self.location_cache[key] = chunk_info
+            return chunk_handle, chunk_locations, err
 
         return None, None, err
 
@@ -187,7 +191,7 @@ class Client:
         """This function calls Master Server GetFileLength Function to
         get total length of the file"""
         master_server = rpc_call(self.master_addr)
-        filelength, err = master_server.get_filelength(path)
+        filelength, err = master_server.get_file_length(path)
         logging.debug("%s length is: %s", path, filelength)
         return filelength, err
 
@@ -197,7 +201,9 @@ class Client:
         from user and will return the file."""
         filelength, err = self.getfilelength(path)
         if err:
-            return err
+            logging.debug("Error while fetching file length %s", err)
+        else:
+            logging.debug("File length fetched from server %s", filelength)
 
         lastbytetoread = min(byteoffset + bytestoread, filelength)
         startchunkindex = byteoffset // CHUNK_SIZE
@@ -219,7 +225,8 @@ class Client:
                     logging.debug("Unable to read required data, Error while reading chunkindex %s: %s", i, err)
                     return err
                 else:
-                    file.write(chunkdata)
+                    logging.debug("ChunkData Received: %s, type %s", chunkdata, type(chunkdata))
+                    file.write(chunkdata.data)
         return None
 
     # read a chunk
@@ -229,9 +236,10 @@ class Client:
         if err:
             return None, err
         random_num = random.randint(0, 2)
-        chunk_loc = chunk_locations[random_num]
+        chunk_loc = chunk_locations[0]  # TODO: replace 0 with random_num
+        logging.debug("Chunk Handle  %s and chunk Locations %s ", chunk_handle, chunk_locations)
         chunk_server = rpc_call(chunk_loc)
-        data, err = chunk_server.read(path, chunk_handle, start, length)
+        data, err = chunk_server.read(chunk_handle, start, length)
         # TODO :Handle case if server is down
         return data, err
 
@@ -273,3 +281,4 @@ if __name__ == "__main__":
 
     client.create('a')
     client.write('a', 0, "Apple")
+    client.read('a', 0, 5, "content")
