@@ -158,6 +158,9 @@ class Master:
         file_length, err = self.namespace_manager.get_file_length(path)
         return file_length, err
 
+    def update_chunkserver_list(self, chunksrv_addr):
+        self.chunk_manager.update_chunkserver_list(chunksrv_addr)
+
 
 def start_master():
     m = Master()

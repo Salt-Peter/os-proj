@@ -214,5 +214,8 @@ class ChunkManager:
             #       Need to ensure the there are no duplicates in the array.
             info.locations.append(address)
 
+    def update_chunkserver_list(self, chunksrv_addr):
+        self.chunk_servers.add(chunksrv_addr)
+
 
 log = default_logger
