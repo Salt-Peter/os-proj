@@ -279,5 +279,5 @@ if __name__ == "__main__":
     log.info("Client: %s", client)
 
     client.create('a')
-    client.write('a', 0, "Apple")
-    client.read('a', 0, 5, "content")
+    client.write('a', 0, "A man a plan canal panama.")
+    client.read('a', 0, 10, "temp/content")

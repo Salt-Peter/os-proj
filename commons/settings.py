@@ -1,5 +1,6 @@
 # Read: https://www.python.org/dev/peps/pep-0008/#constants
-CHUNK_SIZE = 64 * (1 << 20)  # 64 MB
+# CHUNK_SIZE = 64 * (1 << 20)  # 64 MB
+CHUNK_SIZE = 4  # 4 Bytes # FIXME remove in production
 REPLICATION_FACTOR = 3
 
 MASTER_HOST = "127.0.0.1"
