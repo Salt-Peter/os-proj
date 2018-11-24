@@ -44,13 +44,22 @@ class Master:
             return self.client_id
 
     def create(self, path):
-        """Will be called by client to create a file in the namespace"""
-        req_logging.info("CREATE API called")
+        """
+        Will be called by client to create a file in the namespace (in memory)
+        :param path: name of the file
+        :return: True if successful and errors if any.
+        """
         rlog.info("args: path=%s", path)
         res, err = self.namespace_manager.create(path)
         return res, err
 
     def add_chunk(self, path, chunk_index):
+        """
+        Client calls to get a new chunk.
+        :param path: name of the file
+        :param chunk_index:
+        :return: chunk_handle of the chunk created and address of chunkservers containing that chunk
+        """
         rlog.info("args: path=%s, chunk_index=%d", path, chunk_index)
         info, err = self.chunk_manager.add_chunk(path, chunk_index)
         if err:
@@ -59,17 +68,25 @@ class Master:
         return info.chunk_handle, info.locations, None
 
     def find_locations(self, path, chunk_index):
-        """Returns chunk handle and an array of chunk locations for a given file name and chunk index"""
+        """
+        Returns CHUNK HANDLE and an array of CHUNK LOCATIONS for a given file name and chunk index.
+        :param path:
+        :param chunk_index:
+        :return: chunk_info {chunk_handle, chunk_locations} and errors.
+        """
         rlog.info("args: path=%s, chunk_index=%d", path, chunk_index)
         chunk_info, err = self.chunk_manager.find_locations(path, chunk_index)
 
         return chunk_info, err
 
-    # // FindLeaseHolder replies to client RPC to get the primary chunkserver for a
-    # // given chunkhandle. If there is no current lease holder, chunkManager will
-    # // automatically select one of the replicas to be the primary, and grant lease
-    # // to that primary.
     def find_lease_holder(self, chunk_handle):
+        """
+        Client calls to get the PRIMARY chunk server for a given chunk handle.
+        If there is no current lease holder, master will automatically select
+        one of the replicas to be the primary, and grant lease to that chunk server.
+        :param chunk_handle:
+        :return: lease holder, lease expiration timestamp, errors
+        """
         rlog.info("args: chunk_handle=%d", chunk_handle)
         lease, err = self.chunk_manager.find_lease_holder(chunk_handle)
         if err:
@@ -77,20 +94,39 @@ class Master:
 
         return lease.primary, lease.expiration, None
 
-    # // Chunk server calls ReportChunk to tell the master
-    # // they have a certain chunk and the number of defined bytes in
-    # // the chunk.
     def report_chunk(self, server, chunk_handle, chunk_index, length, path):
-        rlog.debug("Report chunk called")
+        """
+        Called by chunk servers to tell the master that they have a certain chunk and
+        the number of defined bytes in that chunk.
+        :param server:
+        :param chunk_handle:
+        :param chunk_index:
+        :param length:
+        :param path:
+        :return:
+        """
+        rlog.debug(
+            f"received request from chunk server:{server} with args: "
+            f"chunk_handle={chunk_handle}, length={length}, chunk_index={chunk_index}, path={path}")
+
+        # FIXME: path_index looks unnecessary :/
         path_index, err = self.chunk_manager.get_path_index_from_handle(chunk_handle)
+
+        assert path_index.index == chunk_index
+
         if err:
             return None, err
         self.chunk_manager.set_chunk_location(chunk_handle, server)
 
-        #   // Update file information
+        # Update file information
         file_length, err = self.namespace_manager.get_file_length(path_index.path)
         calculated = CHUNK_SIZE * path_index.index + length
+
+        import ipdb
+        ipdb.set_trace()
+
         log.debug("Result: %s, index: %s, length: %s", calculated, path_index.index, length)
+
         if calculated > file_length:
             self.namespace_manager.set_file_length(path_index.path, calculated)
             log.debug("New length %s", calculated)
