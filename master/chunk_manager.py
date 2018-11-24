@@ -3,37 +3,44 @@ import time
 from threading import Lock
 from typing import List, Dict
 
-from numpy import uint64, uintp
+from commons.errors import FileNotFoundErr, ChunkAlreadyExistsErr, ChunkhandleDoesNotExistErr, NoChunkServerAliveErr, \
+    ChunkHandleNotFoundErr
+from commons.loggers import Logger
+from commons.settings import REPLICATION_FACTOR
+
+LEASE_TIMEOUT = 60  # expires in 1 minute
 
 
-# Persistent information of a specific chunk.
 class Chunk:
-    chunk_handle: uintp
+    chunk_handle: int
     __slots__ = 'chunk_handle'
 
-    def __init__(self):
-        self.chunk_handle = uint64(0)
+    def __init__(self, chunk_handle=0):
+        self.chunk_handle = chunk_handle
 
 
 # In-memory detailed information of a specific chunk.
 class ChunkInfo:
     locations: List[str]
-    handle: uintp
-    __slots__ = 'handle', 'locations'
+    chunk_handle: int
+    __slots__ = 'chunk_handle', 'locations'
 
-    def __init__(self):
-        self.handle = uint64(0)  # Unique chunk handle.
-        self.locations = []
+    def __init__(self, handle=0, locations=None):
+        self.chunk_handle = handle  # Unique chunk handle.
+        self.locations = locations
+
+    def __repr__(self):
+        return f'ChunkInfo(chunk_handle={self.chunk_handle}, locations={self.locations})'
 
 
 class PathIndex:
-    index: uintp
+    index: int
     path: str
     __slots__ = 'path', 'index'
 
-    def __init__(self):
-        self.path = ""
-        self.index = uint64(0)
+    def __init__(self, path="", index=0):
+        self.path = path
+        self.index = index
 
 
 class Lease:
@@ -43,23 +50,23 @@ class Lease:
 
     def __init__(self):
         self.primary = ''  # Primary chunk server's location.
-        self.expiration = time.time()  # Lease expiration time.
+        self.expiration = 0  # Lease expiration time.
 
 
 class ChunkManager:
     mutex: Lock
-    chunk_handle: uintp
-    chunks: Dict[str, Dict[uintp, Chunk]]
-    handles: Dict[uintp, PathIndex]
-    locations: Dict[uintp, ChunkInfo]
+    chunk_handle: int
+    chunks: Dict[str, Dict[int, Chunk]]
+    handles: Dict[int, PathIndex]
+    locations: Dict[int, ChunkInfo]
     chunk_servers: List[str]
-    leases: Dict[uintp, Lease]
+    leases: Dict[int, Lease]
 
     __slots__ = 'lock', 'chunk_handle', 'chunks', 'handles', 'locations', 'chunk_servers', 'leases'
 
     def __init__(self):
         self.lock = threading.Lock()
-        self.chunk_handle = uint64(0)  # incremented by 1 whenever a new chunk is created
+        self.chunk_handle = 0  # incremented by 1 whenever a new chunk is created
 
         # (path, chunk index) -> chunk information (persistent)
         self.chunks = {}
@@ -68,17 +75,144 @@ class ChunkManager:
         # chunk handle -> chunk locations (in-memory)
         self.locations = {}
         # a list if chunk servers
-        self.chunk_servers = []
+        self.chunk_servers = ['http://127.0.0.1:9010']
         #  chunk handle -> lease
         self.leases = {}
 
     def find_locations(self, path, chunk_index):
         with self.lock:
-            return self.get_chunk_info(path, chunk_index)
+            chunk_info, err = self.get_chunk_info(path, chunk_index)
+            return chunk_info, err
 
     # Assumes lock is acquired
     # Get chunk information associated with a file and a chunk index.
     # Returns chunk information and errors.
     def get_chunk_info(self, path, chunk_index):
         value = self.chunks.get(path, None)
-        # if:
+        if not value:
+            log.debug(FileNotFoundErr)
+            return None, FileNotFoundErr
+
+        chunk = value.get(chunk_index, None)
+        if not chunk:
+            log.debug("Chunk index not found.")
+            return None, "Chunk index not found."
+
+        chunk_info = self.locations.get(chunk.chunk_handle, None)
+        if not chunk_info:
+            log.debug("Locations not found.")
+            return None, "Locations not found"
+
+        return chunk_info, None
+
+    def add_chunk(self, path, chunk_index):
+        with self.lock:
+            return self.add_chunk_helper(path, chunk_index)
+
+    # Assumes lock is acquired
+    def add_chunk_helper(self, path, chunk_index):
+        chunk = self.chunks.get(path, None)
+        if not chunk:
+            self.chunks[path] = {}
+
+        chunk_info = self.chunks[path].get(chunk_index, None)
+        if chunk_info:
+            log.debug("Chunk index already exists.")
+            return chunk_info, ChunkAlreadyExistsErr
+
+        # get a unique chunk handle
+        handle = self.chunk_handle
+
+        # increment for future
+        self.chunk_handle += 1
+
+        # TODO randomly pick REPLICATION FACTOR chunk servers
+        # locations = pick_randomly(self.chunk_servers, REPLICATION_FACTOR)
+        locations = self.chunk_servers[:]
+
+        # update our dicts
+        self.chunks[path][chunk_index] = Chunk(handle)
+        self.locations[handle] = ChunkInfo(handle, locations)
+        self.handles[handle] = PathIndex(path, chunk_index)
+
+        return self.locations[handle], None
+
+    # Find lease holder and return its location.
+    def find_lease_holder(self, chunk_handle):
+        with self.lock:
+            ok = self.check_lease(chunk_handle)
+            # If no lease holder, then grant a new lease.
+            if not ok:
+                err = self.add_lease(chunk_handle)
+                if err:
+                    return Lease(), err
+
+            # Return current lease holder for handle.
+            lease = self.leases[chunk_handle]
+            return lease, None
+
+    # Pre-condition: m.lock is acquired.
+    # will check whether the lease is still valid.
+    def check_lease(self, chunk_handle):
+        lease = self.leases.get(chunk_handle, None)
+        if not lease:
+            return False
+
+        # If lease on the primary has already expired, return false
+        if lease.expiration < time.time():
+            return False
+
+        return True
+
+    # Assumes m.lock is acquired.
+    # will grant a lease to a randomly selected server as the primary.
+    # returns err if any or None
+    def add_lease(self, chunk_handle):
+        locations = self.locations.get(chunk_handle, None)
+
+        if not locations:
+            return ChunkhandleDoesNotExistErr
+
+        lease = self.leases.get(chunk_handle, None)
+
+        if not lease:
+            # Entry not found, create a new one.
+            lease = Lease()
+            self.leases[chunk_handle] = lease
+
+        #  If no chunk server is alive, can't grant a new lease.
+        if len(locations.locations) == 0:
+            return NoChunkServerAliveErr
+
+        #  Assign new values to lease.
+        import random
+        # TODO: pick primary randomly
+        # lease.primary = locations.locations[random.randint(0, REPLICATION_FACTOR - 1)]
+        lease.primary = locations.locations[0]
+        lease.expiration = time.time() + LEASE_TIMEOUT
+        self.leases[chunk_handle] = lease
+
+        return None
+
+    # // Get (file, chunk index) associated with the specified chunk handle.
+    def get_path_index_from_handle(self, chunk_handle):
+        with self.lock:  # Fixme : might need an rlock here
+            path_index = self.handles.get(chunk_handle, None)
+            if not path_index:
+                return None, ChunkHandleNotFoundErr
+            return path_index, None
+
+    # // Set the location associated with a chunk handle.
+    def set_chunk_location(self, chunk_handle, address):
+        with self.lock:
+            info = self.locations.get(chunk_handle, None)
+            if not info:
+                info = ChunkInfo(chunk_handle, [])
+                self.locations[chunk_handle] = info
+
+            # TODO: Add address into the locations array.
+            #       Need to ensure the there are no duplicates in the array.
+            info.locations.append(address)
+
+
+log = Logger.get_default_logger()
