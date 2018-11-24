@@ -51,6 +51,19 @@ class NamespaceManager:
         else:
             return False
 
+    def get_file_length(self, path):
+        with self.mutex:
+            info = self.paths.get(path, None)
+            if not info:
+                return 0, FileNotFoundErr
+            return info.length, None
+
+    def set_file_length(self, path, length):
+        with self.mutex:
+            info = self.paths.get(path, None)
+            if info:  # add check to prevent NPE
+                info.length = length
+
 
 def get_parent(path):
     idx = path.rfind('/')

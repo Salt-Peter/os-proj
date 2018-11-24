@@ -1,10 +1,8 @@
 import threading
 from xmlrpc.server import SimpleXMLRPCServer
 
-from numpy import uint64
-
 from commons.loggers import Logger
-from commons.settings import MASTER_ADDR, MASTER_PORT, MASTER_HOST
+from commons.settings import MASTER_ADDR, MASTER_PORT, MASTER_HOST, CHUNK_SIZE
 from master.chunk_manager import ChunkManager
 from master.metadata_manager import load_metadata, update_metadata
 from master.namespace_manager import NamespaceManager
@@ -17,7 +15,7 @@ class Master:
     def __init__(self):
         self.my_addr = MASTER_ADDR
         self.client_id = 0  # counter to give next client ID
-        self.chunk_handle = uint64(0)  # counter to give next chunk handle ID
+        self.chunk_handle = 0  # counter to give next chunk handle ID
         self.mutex = threading.Lock()  # TODO: probably use a re entrant lock
         self.metadata_file = 'master_metadata.txt'  # File that contains masters metadata
 
@@ -52,13 +50,51 @@ class Master:
         return res, err
 
     def add_chunk(self, path, chunk_index):
-        pass
+        req_logging.info("ADD CHUNK API called")
+        info, err = self.chunk_manager.add_chunk(path, chunk_index)
+        if err:
+            return None, None, err
+
+        print("HERE", info, type(info))
+        return info.chunk_handle, info.locations, None
 
     def find_locations(self, path, chunk_index):
         """Returns chunk handle and an array of chunk locations for a given file name and chunk index"""
-        chunk_handle, chunk_locations, err = self.chunk_manager.find_locations(path, chunk_index)
+        chunk_info, err = self.chunk_manager.find_locations(path, chunk_index)
 
-        return chunk_handle, chunk_locations, err
+        return chunk_info, err
+
+    # // FindLeaseHolder replies to client RPC to get the primary chunkserver for a
+    # // given chunkhandle. If there is no current lease holder, chunkManager will
+    # // automatically select one of the replicas to be the primary, and grant lease
+    # // to that primary.
+    def find_lease_holder(self, chunk_handle):
+        req_logging.info("chunk_handle: %s", chunk_handle)
+        lease, err = self.chunk_manager.find_lease_holder(chunk_handle)
+        if err:
+            return None, None, err
+
+        return lease.primary, lease.expiration, None
+
+    # // Chunk server calls ReportChunk to tell the master
+    # // they have a certain chunk and the number of defined bytes in
+    # // the chunk.
+    def report_chunk(self, server, chunk_handle, chunk_index, length, path):
+        req_logging.debug("Report chunk called")
+        path_index, err = self.chunk_manager.get_path_index_from_handle(chunk_handle)
+        if err:
+            return None, err
+        self.chunk_manager.set_chunk_location(chunk_handle, server)
+
+        #   // Update file information
+        file_length, err = self.namespace_manager.get_file_length(path_index.path)
+        calculated = CHUNK_SIZE * path_index.index + length
+        logging.debug("Result: %s, index: %s, length: %s", calculated, path_index.index, length)
+        if calculated > file_length:
+            self.namespace_manager.set_file_length(path_index.path, calculated)
+            logging.debug("New length", calculated)
+
+        return None
 
 
 def start_master():

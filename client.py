@@ -1,5 +1,6 @@
 import time
 
+from commons.datastructures import DataId
 from commons.errors import ChunkAlreadyExistsErr
 from commons.loggers import Logger
 from commons.settings import MASTER_ADDR, CHUNK_SIZE
@@ -84,10 +85,7 @@ class Client:
         if err:
             return False
 
-        data_id = {
-            'client_id': self.client_id,
-            'timestamp': time.time()
-        }
+        data_id = DataId(self.client_id, time.time())
 
         # Push data to all replicas' memory.
         err = self.push_data(chunk_locations, data_id, data)
@@ -104,8 +102,9 @@ class Client:
             return False
 
         primary_cs = rpc_call(primary)
-        err = primary_cs.write(data_id=data_id, path=path, chunk_index=chunk_index, chunk_handle=chunk_handle,
-                               offset=start, chunk_locations=chunk_locations)
+        err = primary_cs.write(data_id.client_id, data_id.timestamp, path,
+                               chunk_index, chunk_handle, start,
+                               chunk_locations)
 
         if err:
             return False
@@ -145,15 +144,16 @@ class Client:
         if not err:
             # Save into location cache
             self.location_cache[key] = resp
+            return resp.chunk_handle, resp.locations, err
 
-        return resp.chunk_handle, resp.chunk_locations, err
+        return None, None, err
 
     # returns chunk_handle and chunklocations of the newly added chunk
     def add_chunk(self, path, chunk_index):
         ms = rpc_call(self.master_addr)
-        resp, err = ms.add_chunk(path, chunk_index)
+        chunk_handle, chunk_locations, err = ms.add_chunk(path, chunk_index)
 
-        return resp.chunk_handle, resp.chunk_locations, err
+        return chunk_handle, chunk_locations, err
 
     # find_lease_holder returns the address of current lease holder(one of the chunk servers) of the target chunk.
     def find_lease_holder(self, chunk_handle):
@@ -164,18 +164,19 @@ class Client:
 
         # If not found in cache, RPC the master server.
         ms = rpc_call(self.master_addr)
-        resp, err = ms.find_lease_holder(chunk_handle)
+        primary, lease_ends, err = ms.find_lease_holder(chunk_handle)
 
         if not err:
-            self.lease_holder_cache[key] = resp
-            return resp.primary
+            self.lease_holder_cache[key] = {'primary': primary, 'lease_ends': lease_ends}
+            return primary
 
         return None
 
+    # The push_data function pushes data to all replica's memory through RPC.
     def push_data(self, chunk_locations, data_id, data):
         for srv_addr in chunk_locations:
             cs = rpc_call(srv_addr)
-            err = cs.push_data(data_id, data)
+            err = cs.push_data(data_id.client_id, data_id.timestamp, data)
             if err:
                 return err
 
@@ -242,3 +243,4 @@ if __name__ == "__main__":
     logging.info("Client: %s", client)
 
     client.create('a')
+    client.write('a', 0, "Apple")

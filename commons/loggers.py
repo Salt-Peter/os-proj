@@ -29,8 +29,8 @@ class Logger:
 
 
 class LogFormats:
-    DEFAULT_FORMAT = '%(filename)s:%(funcName)s - [%(levelname)s] - %(message)s'
-    REQUEST_FORMAT = '%(asctime)s - %(funcName)s - [%(levelname)s] - %(message)s'
+    DEFAULT_FORMAT = '[%(filename)s %(funcName)s] - [%(levelname)s] - %(message)s'
+    REQUEST_FORMAT = '%(asctime)s - [%(filename)s %(funcName)s] - [%(levelname)s] - %(message)s'
     THREAD_FORMAT = '%(asctime)s - [%(thread)d %(threadName)s] - [%(levelname)s] - %(message)s'
 
 

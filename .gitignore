@@ -219,3 +219,4 @@ pip-selfcheck.json
 
 # ignore metadata and log files
 master_metadata.txt
+temp/
