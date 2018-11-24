@@ -158,7 +158,14 @@ class Master:
         file_length, err = self.namespace_manager.get_file_length(path)
         return file_length, err
 
-    def update_chunkserver_list(self, chunksrv_addr):
+    def notify_master(self, chunksrv_addr):
+        """
+        When a chunk server is created,
+        it calls this function to notify master of its presence.
+        Then master adds this address to its chunkserver list
+        :param chunksrv_addr: http://<ip_addr>:<port>
+        :return: None
+        """
         self.chunk_manager.update_chunkserver_list(chunksrv_addr)
 
 

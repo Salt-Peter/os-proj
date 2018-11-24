@@ -41,7 +41,7 @@ class ChunkServer:
 
         # tell master about the presence of this chunk server
         ms = rpc_call(self.master_addr)
-        ms.update_chunkserver_list(self.my_addr)
+        ms.notify_master(self.my_addr)
 
     # PushData handles client RPC to store data in memory.
     # Data is identified with a mapping from DataId:[ClientID, Timestamp] -> Data.
