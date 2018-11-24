@@ -1,4 +1,5 @@
 import xmlrpc.client
+
 from cachetools import TTLCache
 
 
@@ -11,12 +12,13 @@ def rpc_call(server_addr):
 
 # randomly picks n random elements from array arr
 def pick_randomly(arr, n):
+    # TODO: implement random sampling methods like reservoir sampling
     res = []
     import random
-    perm = range(len(arr))
+    perm = list(range(len(arr)))
     random.shuffle(perm)
 
-    for i in range(n):
+    for i in range(min(n, len(arr))):
         res.append(arr[perm[i]])
 
     return res

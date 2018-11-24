@@ -1,3 +1,4 @@
+import random
 import threading
 import time
 from threading import Lock
@@ -6,6 +7,8 @@ from typing import List, Dict
 from commons.errors import FileNotFoundErr, ChunkAlreadyExistsErr, ChunkhandleDoesNotExistErr, NoChunkServerAliveErr, \
     ChunkHandleNotFoundErr
 from commons.loggers import default_logger
+from commons.settings import REPLICATION_FACTOR
+from commons.utils import pick_randomly
 
 LEASE_TIMEOUT = 60  # expires in 1 minute
 
@@ -125,9 +128,7 @@ class ChunkManager:
         # increment for future
         self.chunk_handle += 1
 
-        # TODO randomly pick REPLICATION FACTOR chunk servers
-        # locations = pick_randomly(self.chunk_servers, REPLICATION_FACTOR)
-        locations = self.chunk_servers[:]
+        locations = pick_randomly(self.chunk_servers, REPLICATION_FACTOR)
 
         # update our dicts
         self.chunks[path][chunk_index] = Chunk(handle)
@@ -167,9 +168,9 @@ class ChunkManager:
     # will grant a lease to a randomly selected server as the primary.
     # returns err if any or None
     def add_lease(self, chunk_handle):
-        locations = self.locations.get(chunk_handle, None)
+        chunk_info = self.locations.get(chunk_handle, None)
 
-        if not locations:
+        if not chunk_info:
             return ChunkhandleDoesNotExistErr
 
         lease = self.leases.get(chunk_handle, None)
@@ -180,13 +181,14 @@ class ChunkManager:
             self.leases[chunk_handle] = lease
 
         #  If no chunk server is alive, can't grant a new lease.
-        if len(locations.locations) == 0:
+        if len(chunk_info.locations) == 0:
             return NoChunkServerAliveErr
 
-        #  Assign new values to lease.
-        # TODO: pick primary randomly
-        # lease.primary = locations.locations[random.randint(0, REPLICATION_FACTOR - 1)]
-        lease.primary = locations.locations[0]
+        # Assign new values to lease.
+        # pick primary randomly
+        lease.primary = chunk_info.locations[
+            random.randint(1, min(len(chunk_info.locations), REPLICATION_FACTOR)) - 1]  # -1 for zero based indexing
+
         lease.expiration = time.time() + LEASE_TIMEOUT
         self.leases[chunk_handle] = lease
 

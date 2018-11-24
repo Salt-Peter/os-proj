@@ -4,7 +4,7 @@ import time
 from commons.datastructures import DataId
 from commons.errors import ChunkAlreadyExistsErr
 from commons.loggers import default_logger
-from commons.settings import MASTER_ADDR, CHUNK_SIZE
+from commons.settings import MASTER_ADDR, CHUNK_SIZE, REPLICATION_FACTOR
 from commons.utils import rpc_call
 # data structure for client
 from master.chunk_manager import ChunkInfo
@@ -234,8 +234,8 @@ class Client:
         chunk_handle, chunk_locations, err = self.find_chunk(path, chunk_index)
         if err:
             return None, err
-        random_num = random.randint(0, 2)
-        chunk_loc = chunk_locations[0]  # TODO: replace 0 with random_num
+        random_num = random.randint(1, min(len(chunk_locations), REPLICATION_FACTOR)) - 1  # -1 for zero based index
+        chunk_loc = chunk_locations[random_num]
         log.debug("Chunk Handle  %s and chunk Locations %s ", chunk_handle, chunk_locations)
         chunk_server = rpc_call(chunk_loc)
         data, err = chunk_server.read(chunk_handle, start, length)
