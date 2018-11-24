@@ -1,6 +1,7 @@
 import time
 
 from commons.datastructures import DataId
+import random
 from commons.errors import ChunkAlreadyExistsErr
 from commons.loggers import Logger
 from commons.settings import MASTER_ADDR, CHUNK_SIZE
@@ -21,7 +22,6 @@ class Client:
 
         self.location_cache = {}  # TODO: implement cache with timeout. need some kind of expiring dict
         self.lease_holder_cache = {}  # TODO: implement cache with timeout
-
 
     def __repr__(self):
         return f'Client(client_id={self.client_id!r}, master_addr={self.master_addr!r})'
@@ -182,58 +182,87 @@ class Client:
 
         return None
 
+    # get FileLength
+    def getfilelength(self, path):
+        """This function calls Master Server GetFileLength Function to
+        get total length of the file"""
+        master_server = rpc_call(self.master_addr)
+        filelength, err = master_server.get_filelength(path)
+        logging.debug("%s length is: %s", path, filelength)
+        return filelength, err
 
-# get FileLength
-def getfileLength(path, c):
-    """This function calls Master Server GetFileLength Function to
-    get total length of the file"""
-    master_server = rpc_call(c.master_addr)
-    filelength, err = master_server.get_filelength(path)
-    if filelength:
-        logging.debug("Length of File %s returned by server %s",path,filelength)
-        return filelength
-    else:
-        logging.error("Error while getting filelength from Master: %s", err)
+    # read a file
+    def read(self, path, byteoffset, bytestoread, filename):
+        """This function will take filename,byteoffset and bytestoread
+        from user and will return the file."""
+        filelength, err = self.getfilelength(path)
+        if err:
+            return err
 
-
-# read a file
-def readfile(path, byteoffset, bytestoread, c):
-    """This function will take filename,byteoffset and bytestoread
-    from user and will return the file."""
-    filelength = getfileLength(path, c)
-    lastbytetoread = min(byteoffset+bytestoread,filelength)
-    startchunkindex = byteoffset//CHUNK_SIZE
-    endchunkindex = lastbytetoread//CHUNK_SIZE
-    finaldata = []
-    for i in range(startchunkindex,endchunkindex+1):
-        startoffset = 0
-        length = CHUNK_SIZE
-        if i == startchunkindex:
-            startoffset = byteoffset % CHUNK_SIZE
-        if i == endchunkindex:
-            rem = lastbytetoread % CHUNK_SIZE
-            if rem == 0:
+        lastbytetoread = min(byteoffset + bytestoread, filelength)
+        startchunkindex = byteoffset // CHUNK_SIZE
+        endchunkindex = (lastbytetoread - 1) // CHUNK_SIZE
+        with open(filename, "ab") as file:
+            for i in range(startchunkindex, endchunkindex + 1):
+                startoffset = 0
                 length = CHUNK_SIZE
-            else:
-                length = rem
-        chunkdata, err = readchunk(path,i,startoffset,length,c)
-        if chunkdata:
-            finaldata.append(chunkdata)
+                if i == startchunkindex:
+                    startoffset = byteoffset % CHUNK_SIZE
+                if i == endchunkindex:
+                    rem = lastbytetoread % CHUNK_SIZE
+                    if rem == 0:
+                        length = CHUNK_SIZE
+                    else:
+                        length = rem
+                chunkdata, err = self.read_helper(path, i, startoffset, length)
+                if err:
+                    logging.debug("Unable to read required data, Error while reading chunkindex %s: %s", i, err)
+                    return err
+                else:
+                    file.write(chunkdata)
+        return None
+
+    # read a chunk
+    def read_helper(self, path, chunk_index, start, length):
+        """Call Chunkserver RPC to read chunkdata"""
+        chunk_handle, chunk_locations, err = self.find_chunk(path, chunk_index)
+        if err:
+            return None, err
+        random_num = random.randint(0, 2)
+        chunk_loc = chunk_locations[random_num]
+        chunk_server = rpc_call(chunk_loc)
+        data, err = chunk_server.read(path, chunk_handle, start, length)
+        # TODO :Handle case if server is down
+        return data, err
+
+    # create a dir
+    def create_dir(self, path):
+        master_server = rpc_call(self.master_addr)
+        resp, err = master_server.create_dir(path)
+        if resp:
+            logging.debug("Create Dir API response %s", resp)
         else:
-            logging.error("Error while reading chunkindex %s: %s",i,err)
+            logging.error("Error creating file '%s'. Why? : %s", path, err)
 
+    # list all files in a directory
+    def list(self, path):
+        master_server = rpc_call(self.master_addr)
+        resp, err = master_server.list(path)
+        if resp:
+            logging.debug("List of files in %s:\n", path)
+            for file in resp:
+                logging.debug("%s\n", file)
+        else:
+            logging.error("Error creating file '%s'. Why? : %s", path, err)
 
-# read a chunk
-def readchunk(path,chunk_index,start,length,c):
-    """Call Chunkserver RPC to read chunkdata"""
-    chunk_handle, chunk_locations, err = findchunklocation(path, chunk_index)
-    if err:
-        return None,err
-    
-
-
-
-
+    # remove file
+    def delete(self, path):
+        master_server = rpc_call(self.master_addr)
+        err = master_server.delete(path)
+        if err:
+            logging.error("Error while deleting %s : %s", path, err)
+        else:
+            logging.info("File Deleted Successfully")
 
 
 if __name__ == "__main__":

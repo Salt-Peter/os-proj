@@ -177,6 +177,18 @@ class ChunkServer:
                                    length, offset)
             return None
 
+    # read content from specific chunk
+    def read(self, chunk_handle, offset, length):
+        """Called by client to read data from specific chunk"""
+        # open file to read data
+        try:
+            with open(self.path + "/" + chunk_handle, "rb") as file:
+                file.seek(int(offset))  # goes to specific offset in a chunk
+                filecontent = file.read(length)  # read all required content in filecontent
+                return filecontent, None
+        except Exception as err:
+            return None, err
+
 
 def report_chunk(cs, chunk_info):
     ms = rpc_call(cs.master_addr)

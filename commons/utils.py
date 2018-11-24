@@ -1,4 +1,5 @@
 import xmlrpc.client
+from cachetools import TTLCache
 
 
 # Helper functions
@@ -19,3 +20,7 @@ def pick_randomly(arr, n):
         res.append(arr[perm[i]])
 
     return res
+
+
+def get_cache(timeout=60, maxsize=10):
+    return TTLCache(maxsize=maxsize, ttl=timeout)

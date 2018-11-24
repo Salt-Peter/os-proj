@@ -42,6 +42,53 @@ class NamespaceManager:
 
             return True, None
 
+    # Create a file
+    def create_dir(self, path: str):
+        with self.mutex:
+            parent = get_parent(path)
+            if not self.exists(parent):
+                return False, PathNotFoundErr
+
+            if not self.is_dir(parent):
+                return False, ParentIsNotDirErr
+
+            if self.exists(path):
+                return False, DirAlreadyExistsErr
+
+            self.paths[path] = Path(True, 0)
+
+            return True, None
+
+    # list all files
+    def list(self, path: str):
+        files = []
+        with self.mutex:
+            if not self.is_dir(path):
+                return files, ParentIsNotDirErr
+
+            if not self.exists(path):
+                return files, PathNotFoundErr
+
+            for file in self.paths:
+                parent = get_parent(file)
+                if parent == path:
+                    files.append(file)
+
+            return files, None
+
+    # delete File
+    def delete(self, path: str):
+        if not self.exists(path):
+            return PathNotFoundErr
+
+        if self.is_dir(path):
+            resp, err = self.list(path)
+            if resp and len(resp) > 0:
+                return DirIsNotEmptyErr
+
+        del self.paths[path]
+        return None
+
     def exists(self, path: str):
         return path in self.paths
 

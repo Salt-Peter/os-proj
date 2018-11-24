@@ -96,6 +96,24 @@ class Master:
 
         return None
 
+    def create_dir(self, path):
+        """Will be called by client to create a dir in the namespace"""
+        req_logging.info("CREATE DIR API called")
+        res, err = self.namespace_manager.create_dir(path)
+        return res, err
+
+    def list(self, path):
+        """Will be called by client to list all files present in given directory path"""
+        req_logging.info("LIST FILES API called")
+        res, err = self.namespace_manager.list(path)
+        return res, err
+
+    def delete(self, path):
+        """Will be called by client to delete a specific file"""
+        req_logging.info("DELETE FILE API called")
+        err = self.namespace_manager.delete(path)
+        return err
+
 
 def start_master():
     m = Master()
