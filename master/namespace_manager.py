@@ -114,4 +114,4 @@ class NamespaceManager:
 
 def get_parent(path):
     import os
-    os.path.dirname(path)
+    return os.path.dirname(path)
