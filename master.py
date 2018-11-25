@@ -140,15 +140,16 @@ class Master:
         res, err = self.namespace_manager.create_dir(path)
         return res, err
 
-    def list(self, path):
+    def list_allfiles(self, path):
         """Will be called by client to list all files present in given directory path"""
         rlog.info("LIST FILES API called")
-        res, err = self.namespace_manager.list(path)
+        res, err = self.namespace_manager.list_allfiles(path)
         return res, err
 
     def delete(self, path):
         """Will be called by client to delete a specific file"""
         rlog.info("DELETE FILE API called")
+        self.chunk_manager.update_deletechunk_list(path)
         err = self.namespace_manager.delete(path)
         return err
 

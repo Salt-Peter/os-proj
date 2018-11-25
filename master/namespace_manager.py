@@ -60,7 +60,7 @@ class NamespaceManager:
             return True, None
 
     # list all files
-    def list(self, path: str):
+    def list_allfiles(self, path: str):
         files = []
         with self.mutex:
             if not self.is_dir(path):

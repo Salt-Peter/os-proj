@@ -254,9 +254,9 @@ class Client:
             log.error("Error creating file '%s'. Why? : %s", path, err)
 
     # list all files in a directory
-    def list(self, path):
+    def list_allfiles(self, path):
         master_server = rpc_call(self.master_addr)
-        resp, err = master_server.list(path)
+        resp, err = master_server.list_allfiles(path)
         if resp:
             log.debug("List of files in %s:\n", path)
             for file in resp:
@@ -290,3 +290,4 @@ if __name__ == "__main__":
     client.create('a')
     client.write('a', 0, "A man a plan canal panama.")
     client.read('a', 0, -1, "temp/content")
+    client.delete('a')
