@@ -2,27 +2,30 @@ import threading
 from xmlrpc.server import SimpleXMLRPCServer
 
 from commons.loggers import default_logger, request_logger
-from commons.settings import CHUNK_SIZE, DEFAULT_MASTER_PORT, DEFAULT_IP
+from commons.settings import CHUNK_SIZE, DEFAULT_MASTER_PORT, DEFAULT_IP, OP_LOG_FILENAME
 from master.chunk_manager import ChunkManager
-from master.metadata_manager import load_metadata, update_metadata
+from master.metadata_manager import load_metadata, update_metadata, OplogActions
 from master.namespace_manager import NamespaceManager
 
 
 class Master:
-    __slots__ = 'my_addr', 'client_id', 'chunk_handle', 'mutex', \
+    __slots__ = 'my_addr', 'client_id', 'mutex', \
                 'metadata_file', 'namespace_manager', 'chunk_manager'
 
     def __init__(self, my_addr):
         self.my_addr = my_addr
         self.client_id = 0  # counter to give next client ID
-        self.chunk_handle = 0  # counter to give next chunk handle ID
         self.mutex = threading.Lock()  # TODO: probably use a re entrant lock
-        self.metadata_file = 'master_metadata.txt'  # File that contains masters metadata
+        self.metadata_file = OP_LOG_FILENAME  # File that contains masters metadata
 
         self.namespace_manager = NamespaceManager()
         self.chunk_manager = ChunkManager()
 
-        # self.chunk_servers = []
+    def __repr__(self):
+        return f"""Master(me={self.my_addr},
+        client_id={self.client_id},
+        namespace_manager={self.namespace_manager},
+        chunk_manager={self.chunk_manager})"""
 
     def test_ok(self):
         """A quick test to see if server is working fine"""
@@ -39,7 +42,7 @@ class Master:
             self.client_id += 1
 
             # make client id persistent in metadata file
-            update_metadata(self)
+            update_metadata(OplogActions.GRANT_CLIENT_ID, self.client_id)
 
             return self.client_id
 

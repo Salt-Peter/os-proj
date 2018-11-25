@@ -2,6 +2,7 @@ import threading
 from typing import Dict
 
 from commons.errors import *
+import master.metadata_manager as meta_mgr
 
 
 class Path:
@@ -39,6 +40,8 @@ class NamespaceManager:
                 return False, FileAlreadyExistsErr
 
             self.paths[path] = Path(False, 0)
+
+            meta_mgr.update_metadata(meta_mgr.OplogActions.CREATE_FILE, path)
 
             return True, None
 

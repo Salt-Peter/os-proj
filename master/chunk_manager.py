@@ -9,6 +9,7 @@ from commons.errors import FileNotFoundErr, ChunkAlreadyExistsErr, ChunkhandleDo
 from commons.loggers import default_logger
 from commons.settings import REPLICATION_FACTOR
 from commons.utils import pick_randomly
+import master.metadata_manager as meta_mgr
 
 LEASE_TIMEOUT = 60  # expires in 1 minute
 
@@ -142,6 +143,10 @@ class ChunkManager:
         self.chunks[path][chunk_index] = Chunk(handle)
         self.locations[handle] = ChunkInfo(handle, locations)
         self.handles[handle] = PathIndex(path, chunk_index)
+
+        # Log this operation to oplog
+        meta_mgr.update_metadata(meta_mgr.OplogActions.ADD_CHUNK,
+                                 (path, chunk_index, handle, locations, self.chunk_handle))
 
         return self.locations[handle], None
 
