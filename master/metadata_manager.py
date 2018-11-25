@@ -11,7 +11,7 @@ SEPARATOR = "|||"
 
 
 class OplogActions:
-    ADD_CHUNK, GRANT_CLIENT_ID, CREATE_FILE = range(3)
+    ADD_CHUNK, GRANT_CLIENT_ID, CREATE_FILE, CREATE_DIR, DELETE_FILE = range(5)
 
 
 def update_metadata(action, data):
@@ -40,6 +40,18 @@ def parse_metadata(m, fp):
 
             path = value
             m.namespace_manager.paths[path] = ns_mgr.Path(False, 0)
+
+        elif key == OplogActions.CREATE_DIR:
+            log.debug("action CREATE_DIR")
+
+            path = value
+            m.namespace_manager.paths[path] = ns_mgr.Path(True, 0)
+
+        elif key == OplogActions.DELETE_FILE:
+            log.debug("action DELETE_FILE")
+
+            path = value
+            del m.namespace_manager.paths[path]
 
         elif key == OplogActions.ADD_CHUNK:
             log.debug("Replaying add chunk")
