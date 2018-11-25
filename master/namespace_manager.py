@@ -113,10 +113,5 @@ class NamespaceManager:
 
 
 def get_parent(path):
-    idx = path.rfind('/')
-    if idx in (-1, 0):  # if path='' or '/'
-        return '/'
-
-    # FIXME: what if path is = '/home/username/' i.e. ends with a trailing '/'
-    #   I don't know whether it's a valid case
-    return path[:idx]
+    import os
+    os.path.dirname(path)
