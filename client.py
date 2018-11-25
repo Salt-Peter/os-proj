@@ -162,7 +162,7 @@ class Client:
         key = f'{chunk_handle}'
         value = self.lease_holder_cache.get(key)
         if value:
-            return value.primary
+            return value['primary']
 
         # If not found in cache, RPC the master server.
         ms = rpc_call(self.master_addr)
