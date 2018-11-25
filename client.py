@@ -343,8 +343,8 @@ if __name__ == "__main__":
     client.write('a', 0, "A man a plan canal panama.")
     client.read('a', 0, -1, "temp/content")
 
-    append_offset = client.append('a', "X")
+    append_offset = client.append('a', "l")
+    client.read('a', 0, -1, "temp/content1")
+    print("APPEND OFFSET : " , append_offset)
     if append_offset == -1:
         print("Error!!")
-    else:
-        client.write('a',append_offset, "X")
