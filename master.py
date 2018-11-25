@@ -68,7 +68,7 @@ class Master:
         if err:
             return None, None, err
 
-        return info.chunk_handle, info.locations, None
+        return info.chunk_handle, info.chunk_locations, None
 
     def find_locations(self, path, chunk_index):
         """

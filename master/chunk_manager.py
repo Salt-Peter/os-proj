@@ -33,7 +33,7 @@ class ChunkInfo:
         self.chunk_locations = locations
 
     def __repr__(self):
-        return f'ChunkInfo(chunk_handle={self.chunk_handle}, locations={self.chunk_locations})'
+        return f'ChunkInfo(chunk_handle={self.chunk_handle}, chunk_locations={self.chunk_locations})'
 
 
 class PathIndex:
