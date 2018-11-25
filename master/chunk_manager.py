@@ -23,16 +23,16 @@ class Chunk:
 
 # In-memory detailed information of a specific chunk.
 class ChunkInfo:
-    locations: List[str]
+    chunk_locations: List[str]
     chunk_handle: int
-    __slots__ = 'chunk_handle', 'locations'
+    __slots__ = 'chunk_handle', 'chunk_locations'
 
     def __init__(self, handle=0, locations=None):
         self.chunk_handle = handle  # Unique chunk handle.
-        self.locations = locations
+        self.chunk_locations = locations
 
     def __repr__(self):
-        return f'ChunkInfo(chunk_handle={self.chunk_handle}, locations={self.locations})'
+        return f'ChunkInfo(chunk_handle={self.chunk_handle}, locations={self.chunk_locations})'
 
 
 class PathIndex:
@@ -105,7 +105,7 @@ class ChunkManager:
             log.debug("Locations not found.")
             return None, None, "Locations not found"
 
-        return chunk_info.locations, chunk_info.chunk_handle, None
+        return chunk_info.chunk_locations, chunk_info.chunk_handle, None
 
     def add_chunk(self, path, chunk_index):
         with self.lock:
@@ -181,13 +181,13 @@ class ChunkManager:
             self.leases[chunk_handle] = lease
 
         #  If no chunk server is alive, can't grant a new lease.
-        if len(chunk_info.locations) == 0:
+        if len(chunk_info.chunk_locations) == 0:
             return NoChunkServerAliveErr
 
         # Assign new values to lease.
         # pick primary randomly
-        lease.primary = chunk_info.locations[
-            random.randint(1, min(len(chunk_info.locations), REPLICATION_FACTOR)) - 1]  # -1 for zero based indexing
+        lease.primary = chunk_info.chunk_locations[
+            random.randint(1, min(len(chunk_info.chunk_locations), REPLICATION_FACTOR)) - 1]  # -1 for zero based indexing
 
         lease.expiration = time.time() + LEASE_TIMEOUT
         self.leases[chunk_handle] = lease
@@ -212,7 +212,7 @@ class ChunkManager:
 
             # TODO: Add address into the locations array.
             #       Need to ensure the there are no duplicates in the array.
-            info.locations.append(address)
+            info.chunk_locations.append(address)
 
     def update_chunkserver_list(self, chunksrv_addr):
         self.chunk_servers.add(chunksrv_addr)
