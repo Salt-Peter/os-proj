@@ -19,3 +19,8 @@ def pick_randomly(seq, n):
 
 def get_cache(timeout=60, maxsize=10):
     return TTLCache(maxsize=maxsize, ttl=timeout)
+
+
+def ensure_dir(dir_path):
+    import os
+    os.makedirs(dir_path, exist_ok=True)

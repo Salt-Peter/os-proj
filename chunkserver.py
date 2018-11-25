@@ -6,7 +6,7 @@ from commons.datastructures import ChunkInfo
 from commons.errors import FileNotFoundErr
 from commons.loggers import request_logger
 from commons.settings import DEFAULT_MASTER_ADDR, DEFAULT_IP
-from commons.utils import rpc_call
+from commons.utils import rpc_call, ensure_dir
 
 
 class ChunkServer:
@@ -203,6 +203,8 @@ def report_chunk(cs, chunk_info):
 
 
 def start_chunkserver(master_addr, my_ip, my_port, path):
+    ensure_dir(path)  # make sure this path exists
+
     my_address = f'http://{my_ip}:{my_port}'
     cs = ChunkServer(my_address, master_addr, path)
 
@@ -226,6 +228,7 @@ if __name__ == '__main__':
     parser.add_argument('--ip', default=DEFAULT_IP)
     parser.add_argument('--port', type=int, required=True)
     parser.add_argument('--master', default=DEFAULT_MASTER_ADDR, help="http://<ip address>:<port>")
+    parser.add_argument('--path', help="Defaults to temp/ck<PORT>")
     args = parser.parse_args()
 
-    start_chunkserver(args.master, args.ip, args.port, f"temp/ck{args.port}")
+    start_chunkserver(args.master, args.ip, args.port, args.path or f"temp/ck{args.port}")
