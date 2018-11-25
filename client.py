@@ -136,7 +136,7 @@ class Client:
         value = self.location_cache.get(key, None)
         if value:
             # cached value found
-            return value.chunk_handle, value.chunk_locations, None
+            return value.chunk_handle, value.locations, None
 
         # else: not found in cache, get from master server
         ms = rpc_call(self.master_addr)
