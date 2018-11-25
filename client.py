@@ -4,7 +4,7 @@ import time
 from commons.datastructures import DataId
 from commons.errors import ChunkAlreadyExistsErr
 from commons.loggers import default_logger
-from commons.settings import DEFAULT_MASTER_ADDR, CHUNK_SIZE, REPLICATION_FACTOR
+from commons.settings import DEFAULT_MASTER_ADDR, CHUNK_SIZE, REPLICATION_FACTOR, APPEND_SIZE
 from commons.utils import rpc_call
 # data structure for client
 from master.chunk_manager import ChunkInfo
@@ -273,6 +273,58 @@ class Client:
         else:
             log.info("File Deleted Successfully")
 
+    # // Append writes data to an offset chosen by the primary chunk server.
+    # // Data is only appended if its size if less then AppendSize, which is one
+    # // fourth of ChunkSize.
+    # // Returns (offset chosen by primary, nil) if success, appropriate
+    # // error otherwise.
+    # // The caller must check return error before using the offset.
+    def append(self, path, data):
+        length = len(data)
+        # First check if the size is valid.
+        if length > APPEND_SIZE:
+            log.error("ERROR: Data size exceeds append limit.")
+            return -1
+
+        # To calculate chunkIndex we must get the length.
+        filelength, err = self.getfilelength(path)
+        if err:
+            log.error("Error while fetching file length %s", err)
+        else:
+            log.debug("File length fetched from server %s", filelength)
+
+        chunk_index = filelength // CHUNK_SIZE
+
+        # Get chunkHandle and chunkLocations
+        chunk_handle, chunk_locations, err = self.get_chunk_guaranteed(path, chunk_index)
+        print("APPEND :: ",chunk_handle, chunk_locations, err)
+        if err:
+            return -1
+
+        # Construct dataId with clientId and current timestamp.
+        data_id = DataId(self.client_id, time.time())
+
+        # Push data to all replicas' memory.
+        err = self.push_data(chunk_locations, data_id, data)
+        if err:
+            log.error('Data not pushed to all replicas.')
+            return -1
+
+        # Once data is pushed to all replicas, send append request to the primary.
+        primary = self.find_lease_holder(chunk_handle)
+
+        if not primary:
+            log.error("Primary chunk server not found.")
+            return -1
+
+        # Make Append call to primary chunk server
+        primary_cs = rpc_call(primary)
+        offset = primary_cs.append(data_id.client_id, data_id.timestamp,
+                               chunk_handle, chunk_index, path,
+                               chunk_locations)
+        
+        return offset
+
 
 if __name__ == "__main__":
     log = default_logger
@@ -290,3 +342,9 @@ if __name__ == "__main__":
     client.create('a')
     client.write('a', 0, "A man a plan canal panama.")
     client.read('a', 0, -1, "temp/content")
+
+    append_offset = client.append('a', "X")
+    if append_offset == -1:
+        print("Error!!")
+    else:
+        client.write('a',append_offset, "X")

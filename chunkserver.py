@@ -5,7 +5,7 @@ from xmlrpc.server import SimpleXMLRPCServer
 from commons.datastructures import ChunkInfo
 from commons.errors import FileNotFoundErr
 from commons.loggers import request_logger
-from commons.settings import DEFAULT_MASTER_ADDR, DEFAULT_IP
+from commons.settings import DEFAULT_MASTER_ADDR, DEFAULT_IP, CHUNK_SIZE
 from commons.utils import rpc_call, ensure_dir
 
 
@@ -194,6 +194,59 @@ class ChunkServer:
         except Exception as err:
             return None, err
 
+    # // Append accepts client append request and append the data to an offset
+    # // chosen by the primary replica. It then serializes the request just like
+    # // Write request, and send it to all secondary replicas.
+    # // If appending the record to the current chunk would cause the chunk to
+    # // exceed the maximum size, append fails and the client must retry.
+    # // It also puts the offset chosen in AppendReply so the client knows where
+    # // the data is appended to.
+    def append(self, client_id, timestamp, chunk_handle, chunk_index, path, chunk_locations):
+        log.debug("ChunkServer addr: %s", self.my_addr)
+        with self.mutex:
+            log.debug("ChunkServer: Append RPC. Lock Acquired")
+            # Extract/define arguments.
+            key = f'{client_id}|{timestamp}'
+            data = self.data.get(key, None)
+            if not data:
+                log.debug("ChunkServer: Append RPC. Lock Released.")
+                return "ChunkServer.Append: requested data is not in memory"
+            length = len(data)
+            filename = f"{chunk_handle}"
+
+            # Get length of the current chunk so we can calculate an offset.
+            chunk_info = self.chunks[chunk_handle]
+            # If we cannot find chunkInfo, means this is a new chunk, therefore offset
+            # should be zero, otherwise the offset should be the chunk length.
+            if chunk_info is None:
+                chunk_length = 0
+            else:
+                chunk_length = chunk_info.length
+
+            # If appending the record to the current chunk would cause the chunk to
+            # exceed the maximum size, report error for client to retry at another
+            # chunk.
+            if chunk_length + length >= CHUNK_SIZE:
+                # TODO error by padding chunk
+                return -1
+
+            # Apply write request to local state, with chunkLength as offset.
+            err = self.apply_write(filename, data, chunk_length)
+            if err:
+                log.debug("ChunkServer: Append RPC. Lock Released.")
+                return -1
+
+            # Update chunkserver metadata.
+            self.report_chunk_info(chunk_handle, chunk_index, path, length, chunk_length)
+
+            # Apply append to all secondary replicas.
+            err = self.apply_to_secondary(client_id, timestamp, path, chunk_index, chunk_handle, chunk_length, chunk_locations)
+            if err:
+                return -1
+
+            # TODO chunk lease extension
+
+            return chunk_length + (chunk_index*CHUNK_SIZE)
 
 def report_chunk(cs, chunk_info):
     ms = rpc_call(cs.master_addr)
