@@ -203,8 +203,10 @@ class Client:
             log.debug("Error while fetching file length %s", err)
         else:
             log.debug("File length fetched from server %s", filelength)
-
-        lastbytetoread = min(byteoffset + bytestoread, filelength)
+        if bytestoread < 0:
+            lastbytetoread = filelength
+        else:
+            lastbytetoread = min(byteoffset + bytestoread, filelength)
         startchunkindex = byteoffset // CHUNK_SIZE
         endchunkindex = (lastbytetoread - 1) // CHUNK_SIZE
         with open(filename, "ab") as file:
@@ -287,4 +289,4 @@ if __name__ == "__main__":
 
     client.create('a')
     client.write('a', 0, "A man a plan canal panama.")
-    client.read('a', 0, 10, "temp/content")
+    client.read('a', 0, -1, "temp/content")
