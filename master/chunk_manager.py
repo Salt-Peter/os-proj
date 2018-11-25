@@ -81,6 +81,14 @@ class ChunkManager:
         #  chunk handle -> lease
         self.leases = {}
 
+    def __repr__(self):
+        return f""" ChunkManager(chunk_handle={self.chunk_handle},
+                                 chunks={self.chunks},
+                                 handles={self.handles},
+                                 locations={self.locations},
+                                 chunk_servers={self.chunk_servers}
+                                 leases={self.leases})"""
+
     def find_locations(self, path, chunk_index):
         with self.lock:
             chunk_locations, chunk_handle, err = self.get_chunk_info(path, chunk_index)
