@@ -2,7 +2,7 @@ import threading
 from xmlrpc.server import SimpleXMLRPCServer
 
 from commons.loggers import default_logger, request_logger
-from commons.settings import MASTER_ADDR, MASTER_PORT, MASTER_HOST, CHUNK_SIZE
+from commons.settings import CHUNK_SIZE, DEFAULT_MASTER_PORT, DEFAULT_IP
 from master.chunk_manager import ChunkManager
 from master.metadata_manager import load_metadata, update_metadata
 from master.namespace_manager import NamespaceManager
@@ -12,8 +12,8 @@ class Master:
     __slots__ = 'my_addr', 'client_id', 'chunk_handle', 'mutex', \
                 'metadata_file', 'namespace_manager', 'chunk_manager'
 
-    def __init__(self):
-        self.my_addr = MASTER_ADDR
+    def __init__(self, my_addr):
+        self.my_addr = my_addr
         self.client_id = 0  # counter to give next client ID
         self.chunk_handle = 0  # counter to give next chunk handle ID
         self.mutex = threading.Lock()  # TODO: probably use a re entrant lock
@@ -169,13 +169,13 @@ class Master:
         self.chunk_manager.update_chunkserver_list(chunksrv_addr)
 
 
-def start_master():
-    m = Master()
+def start_master(ip, port):
+    m = Master(f'http://{ip}:{port}')
 
     # restore previous launch's meta data
     load_metadata(m)
 
-    master_server = SimpleXMLRPCServer((MASTER_HOST, MASTER_PORT),
+    master_server = SimpleXMLRPCServer((ip, port),
                                        logRequests=True,
                                        allow_none=True)
 
@@ -187,6 +187,7 @@ def start_master():
     # or register_instance(<class's_instance>)  # All the methods of the instance are published as XML-RPC methods
     master_server.register_instance(m)
 
+    print("Master running at: ", m.my_addr)
     master_server.serve_forever()
 
     # TODO: launch background tasks (eg. gc, heartbeat) in a separate thread
@@ -196,4 +197,11 @@ if __name__ == '__main__':
     log = default_logger
     rlog = request_logger
 
-    start_master()
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--ip', default=DEFAULT_IP)
+    parser.add_argument('--port', type=int, default=DEFAULT_MASTER_PORT)
+    args = parser.parse_args()
+
+    start_master(args.ip, args.port)

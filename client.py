@@ -4,7 +4,7 @@ import time
 from commons.datastructures import DataId
 from commons.errors import ChunkAlreadyExistsErr
 from commons.loggers import default_logger
-from commons.settings import MASTER_ADDR, CHUNK_SIZE, REPLICATION_FACTOR
+from commons.settings import DEFAULT_MASTER_ADDR, CHUNK_SIZE, REPLICATION_FACTOR
 from commons.utils import rpc_call
 # data structure for client
 from master.chunk_manager import ChunkInfo
@@ -273,9 +273,16 @@ class Client:
 
 
 if __name__ == "__main__":
-    client = Client(MASTER_ADDR)
-
     log = default_logger
+
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--master', default=DEFAULT_MASTER_ADDR, help="http://<ip address>:<port>")
+    args = parser.parse_args()
+
+    client = Client(args.master)
+
     log.info("Client: %s", client)
 
     client.create('a')

@@ -16,15 +16,18 @@ mkdir -p temp/ck9011
 mkdir -p temp/ck9012
 mkdir -p temp/ck9013
 ```
-
 # Running the project
 ```bash
+# To see available command line options run
+# python `scriptname` -h
+# eg: python master.py -h
+
 python master.py
 
-python chunkserver.py 9010
-python chunkserver.py 9011
-python chunkserver.py 9012
-python chunkserver.py 9013
+python chunkserver.py --port=9010
+python chunkserver.py --port=9011
+python chunkserver.py --port=9012
+python chunkserver.py --port=9013
 
 python client.py 
 ```

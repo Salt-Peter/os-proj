@@ -1,4 +1,3 @@
-import sys
 import threading
 from typing import Dict, List
 from xmlrpc.server import SimpleXMLRPCServer
@@ -6,7 +5,7 @@ from xmlrpc.server import SimpleXMLRPCServer
 from commons.datastructures import ChunkInfo
 from commons.errors import FileNotFoundErr
 from commons.loggers import request_logger
-from commons.settings import MASTER_ADDR
+from commons.settings import DEFAULT_MASTER_ADDR, DEFAULT_IP
 from commons.utils import rpc_call
 
 
@@ -220,5 +219,13 @@ def start_chunkserver(master_addr, my_ip, my_port, path):
 
 if __name__ == '__main__':
     log = request_logger
-    port = int(sys.argv[1])
-    start_chunkserver(MASTER_ADDR, "127.0.0.1", port, f"temp/ck{port}")
+
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--ip', default=DEFAULT_IP)
+    parser.add_argument('--port', type=int, required=True)
+    parser.add_argument('--master', default=DEFAULT_MASTER_ADDR, help="http://<ip address>:<port>")
+    args = parser.parse_args()
+
+    start_chunkserver(args.master, args.ip, args.port, f"temp/ck{args.port}")
