@@ -248,6 +248,23 @@ class ChunkServer:
 
             return chunk_length + (chunk_index*CHUNK_SIZE)
 
+    # communication with master heartbeat thread
+    def heartbeat_comm(self, msg):
+        chunk_handle_list = []
+        if msg == "Contents?":
+            for chunk_handle in self.chunks.keys():
+                chunk_handle_list.append(chunk_handle)
+            return chunk_handle_list, self.pending_extensions, None
+
+    # delete bad chunk
+    def delete_badchunk(self, bad_chunk):
+        for chunk in bad_chunk:
+            if chunk in self.chunks.keys():
+                del self.chunks[chunk]
+        return True, None
+
+
+
 def report_chunk(cs, chunk_info):
     ms = rpc_call(cs.master_addr)
 

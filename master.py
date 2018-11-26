@@ -172,6 +172,9 @@ class Master:
         """
         self.chunk_manager.update_chunkserver_list(chunksrv_addr)
 
+    def heartbeat(self):
+        self.chunk_manager.heartbeat()
+
 
 def start_master(ip, port):
     m = Master(f'http://{ip}:{port}')
@@ -195,6 +198,7 @@ def start_master(ip, port):
     master_server.serve_forever()
 
     # TODO: launch background tasks (eg. gc, heartbeat) in a separate thread
+    m.heartbeat()
 
 
 if __name__ == '__main__':
