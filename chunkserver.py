@@ -61,8 +61,6 @@ class ChunkServer:
     # the order of application in ChunkServer.writeRequests, then sends the write
     # requests to secondary replicas.
     def write(self, client_id, timestamp, path, chunk_index, chunk_handle, offset, chunk_locations):
-        # import ipdb
-        # ipdb.set_trace()
         log.debug("ChunkServer addr: %s", self.my_addr)
         with self.mutex:
             log.debug("ChunkServer: Write RPC. Lock Acquired")
@@ -231,7 +229,7 @@ class ChunkServer:
                 return -1
 
             # Apply write request to local state, with chunkLength as offset.
-            err = self.apply_write(filename, data, chunk_length)
+            err = self.apply_append(filename, data, chunk_length)
             if err:
                 log.debug("ChunkServer: Append RPC. Lock Released.")
                 return -1
@@ -240,13 +238,25 @@ class ChunkServer:
             self.report_chunk_info(chunk_handle, chunk_index, path, length, chunk_length)
 
             # Apply append to all secondary replicas.
-            err = self.apply_to_secondary(client_id, timestamp, path, chunk_index, chunk_handle, chunk_length, chunk_locations)
+            err = self.apply_to_secondary(client_id, timestamp, path, chunk_index, chunk_handle, chunk_length,
+                                          chunk_locations)
             if err:
                 return -1
 
             # TODO chunk lease extension
 
-            return chunk_length + (chunk_index*CHUNK_SIZE)
+            return chunk_length + (chunk_index * CHUNK_SIZE)
+
+    def apply_append(self, filename, data, offset):
+        # Open file that stores the chunk.
+        # FIXME: possible bug, 'w' will truncate existing file
+        try:
+            with open(f'{self.path}/{filename}', 'a') as fp:  # TODO: create with 0777 perm
+                fp.seek(offset)
+                fp.write(data)
+        except FileNotFoundError:
+            return FileNotFoundErr
+
 
 def report_chunk(cs, chunk_info):
     ms = rpc_call(cs.master_addr)
