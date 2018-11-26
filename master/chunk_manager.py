@@ -9,6 +9,7 @@ from commons.errors import FileNotFoundErr, ChunkAlreadyExistsErr, ChunkhandleDo
 from commons.loggers import default_logger
 from commons.settings import REPLICATION_FACTOR
 from commons.utils import pick_randomly
+import master.metadata_manager as meta_mgr
 
 LEASE_TIMEOUT = 60  # expires in 1 minute
 
@@ -23,16 +24,16 @@ class Chunk:
 
 # In-memory detailed information of a specific chunk.
 class ChunkInfo:
-    locations: List[str]
+    chunk_locations: List[str]
     chunk_handle: int
-    __slots__ = 'chunk_handle', 'locations'
+    __slots__ = 'chunk_handle', 'chunk_locations'
 
     def __init__(self, handle=0, locations=None):
         self.chunk_handle = handle  # Unique chunk handle.
-        self.locations = locations
+        self.chunk_locations = locations
 
     def __repr__(self):
-        return f'ChunkInfo(chunk_handle={self.chunk_handle}, locations={self.locations})'
+        return f'ChunkInfo(chunk_handle={self.chunk_handle}, chunk_locations={self.chunk_locations})'
 
 
 class PathIndex:
@@ -84,6 +85,14 @@ class ChunkManager:
         # a list of chunk handles to be deleted
         self.delete_chunk = []
 
+    def __repr__(self):
+        return f""" ChunkManager(chunk_handle={self.chunk_handle},
+                                 chunks={self.chunks},
+                                 handles={self.handles},
+                                 locations={self.locations},
+                                 chunk_servers={self.chunk_servers}
+                                 leases={self.leases})"""
+
     def find_locations(self, path, chunk_index):
         with self.lock:
             chunk_locations, chunk_handle, err = self.get_chunk_info(path, chunk_index)
@@ -108,7 +117,7 @@ class ChunkManager:
             log.debug("Locations not found.")
             return None, None, "Locations not found"
 
-        return chunk_info.locations, chunk_info.chunk_handle, None
+        return chunk_info.chunk_locations, chunk_info.chunk_handle, None
 
     def add_chunk(self, path, chunk_index):
         with self.lock:
@@ -137,6 +146,10 @@ class ChunkManager:
         self.chunks[path][chunk_index] = Chunk(handle)
         self.locations[handle] = ChunkInfo(handle, locations)
         self.handles[handle] = PathIndex(path, chunk_index)
+
+        # Log this operation to oplog
+        meta_mgr.update_metadata(meta_mgr.OplogActions.ADD_CHUNK,
+                                 (path, chunk_index, handle, locations, self.chunk_handle))
 
         return self.locations[handle], None
 
@@ -184,13 +197,13 @@ class ChunkManager:
             self.leases[chunk_handle] = lease
 
         #  If no chunk server is alive, can't grant a new lease.
-        if len(chunk_info.locations) == 0:
+        if len(chunk_info.chunk_locations) == 0:
             return NoChunkServerAliveErr
 
         # Assign new values to lease.
         # pick primary randomly
-        lease.primary = chunk_info.locations[
-            random.randint(1, min(len(chunk_info.locations), REPLICATION_FACTOR)) - 1]  # -1 for zero based indexing
+        lease.primary = chunk_info.chunk_locations[
+            random.randint(1, min(len(chunk_info.chunk_locations), REPLICATION_FACTOR)) - 1]  # -1 for zero based indexing
 
         lease.expiration = time.time() + LEASE_TIMEOUT
         self.leases[chunk_handle] = lease
@@ -215,7 +228,7 @@ class ChunkManager:
 
             # TODO: Add address into the locations array.
             #       Need to ensure the there are no duplicates in the array.
-            info.locations.append(address)
+            info.chunk_locations.append(address)
 
     def update_chunkserver_list(self, chunksrv_addr):
         self.chunk_servers.add(chunksrv_addr)

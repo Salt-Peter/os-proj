@@ -1,6 +1,7 @@
 import threading
 from typing import Dict
 
+import master.metadata_manager as meta_mgr
 from commons.errors import *
 
 
@@ -40,9 +41,11 @@ class NamespaceManager:
 
             self.paths[path] = Path(False, 0)
 
+            meta_mgr.update_metadata(meta_mgr.OplogActions.CREATE_FILE, path)
+
             return True, None
 
-    # Create a file
+    # FIXME: Too much code repetition from create file
     def create_dir(self, path: str):
         with self.mutex:
             parent = get_parent(path)
@@ -56,6 +59,8 @@ class NamespaceManager:
                 return False, DirAlreadyExistsErr
 
             self.paths[path] = Path(True, 0)
+
+            meta_mgr.update_metadata(meta_mgr.OplogActions.CREATE_DIR, path)
 
             return True, None
 
@@ -87,6 +92,9 @@ class NamespaceManager:
                 return DirIsNotEmptyErr
 
         del self.paths[path]
+
+        meta_mgr.update_metadata(meta_mgr.OplogActions.DELETE_FILE, path)
+
         return None
 
     def exists(self, path: str):
