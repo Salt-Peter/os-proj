@@ -341,6 +341,7 @@ if __name__ == "__main__":
 
     client.create('a')
     client.write('a', 0, "A man a plan canal panama.")
+    client.write('a', 0, "Alpha Omega")
     client.read('a', 0, -1, "temp/content")
 
     append_offset = client.append('a', "l")

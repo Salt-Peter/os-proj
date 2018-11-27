@@ -1,7 +1,7 @@
 # Read: https://www.python.org/dev/peps/pep-0008/#constants
 # CHUNK_SIZE = 64 * (1 << 20)  # 64 MB
 CHUNK_SIZE = 4  # 4 Bytes # FIXME remove in production
-APPEND_SIZE = 2 # for testing purpose, idealy it shoud be 1/4th of the chunk size
+APPEND_SIZE = 2  # for testing purpose, idealy it shoud be 1/4th of the chunk size
 REPLICATION_FACTOR = 3
 
 DEFAULT_IP = "127.0.0.1"

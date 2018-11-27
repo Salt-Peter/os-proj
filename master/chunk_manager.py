@@ -241,41 +241,23 @@ class ChunkManager:
         if chunk_dict:
             for chunk_index, chunk in chunk_dict.items():
                 self.delete_chunk.append(int(chunk.chunk_handle))
-                # del chunk_dict[chunk_index]
             del self.chunks[path]
-        # for chunk_handle in self.delete_chunk:
-        # log.info("%s\n", chunk_handle)
 
     def heartbeat(self):
         """This function will create a seperate thread for all
         chunk servers present in chunkservers list"""
-        heartbeat_thread = {}
-        for chunk_server in self.chunk_servers:
-            t = threading.Thread(target=heartbeat_comm(),
-                                 args=(self.delete_chunk, chunk_server))
-            heartbeat_thread[chunk_server] = t
-        for thread in heartbeat_thread.values():
-            thread.start()
+        thread = threading.Thread(target=heartbeat_comm(),
+                                  args=(self.delete_chunk, self.chunk_servers))
+        thread.start()
 
 
-def heartbeat_comm(delete_chunk, chunk_server_addr):
-    ask_todelete = []
-    chunk_server = rpc_call(chunk_server_addr)
-    log.info("Asking %s for list of chunk_handles", chunk_server_addr)
-    chunk_handle_list, err = chunk_server.comm_master("Contents?")
-    if err:
-        log.info("Unable to connect with %s, will try after some time", chunk_server_addr)
-        return
-    if chunk_handle_list:
-        for chunk_handle in chunk_handle_list:
-            if chunk_handle in delete_chunk:
-                ask_todelete.append(chunk_handle)
-    if len(ask_todelete) > 0:
-        res, err = chunk_server.delete_badchunk(ask_todelete)
-        if err:
-            log.info("%s is unable to delete bad chunks.Will connect after some time", chunk_server_addr)
-        if res:
-            log.info("%s has successfully deleted bad chunks", chunk_server_addr)
+def heartbeat_comm(delete_chunk, chunk_servers):
+    for chunk_server_addr in chunk_servers:
+        chunk_server = rpc_call(chunk_server_addr)
+
+
+
+
 
 
 log = default_logger
