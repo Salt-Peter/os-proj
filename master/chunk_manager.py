@@ -4,12 +4,12 @@ import time
 from threading import Lock
 from typing import List, Dict, Set
 
+import master.metadata_manager as meta_mgr
 from commons.errors import FileNotFoundErr, ChunkAlreadyExistsErr, ChunkhandleDoesNotExistErr, NoChunkServerAliveErr, \
     ChunkHandleNotFoundErr
 from commons.loggers import default_logger
 from commons.settings import REPLICATION_FACTOR
 from commons.utils import pick_randomly
-import master.metadata_manager as meta_mgr
 
 LEASE_TIMEOUT = 60  # expires in 1 minute
 
@@ -203,7 +203,8 @@ class ChunkManager:
         # Assign new values to lease.
         # pick primary randomly
         lease.primary = chunk_info.chunk_locations[
-            random.randint(1, min(len(chunk_info.chunk_locations), REPLICATION_FACTOR)) - 1]  # -1 for zero based indexing
+            random.randint(1,
+                           min(len(chunk_info.chunk_locations), REPLICATION_FACTOR)) - 1]  # -1 for zero based indexing
 
         lease.expiration = time.time() + LEASE_TIMEOUT
         self.leases[chunk_handle] = lease
@@ -240,14 +241,9 @@ class ChunkManager:
         if chunk_dict:
             for chunk_index, chunk in chunk_dict.items():
                 self.delete_chunk.append(int(chunk.chunk_handle))
-                #del chunk_dict[chunk_index]
             del self.chunks[path]
         for chunk_handle in self.delete_chunk:
             log.info("%s\n", chunk_handle)
-
-
-
-
 
 
 log = default_logger
