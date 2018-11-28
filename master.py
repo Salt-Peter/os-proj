@@ -4,7 +4,7 @@ from xmlrpc.server import SimpleXMLRPCServer
 from commons.loggers import default_logger, request_logger
 from commons.settings import CHUNK_SIZE, DEFAULT_MASTER_PORT, DEFAULT_IP, OP_LOG_FILENAME
 from master.chunk_manager import ChunkManager
-from master.metadata_manager import load_metadata, update_metadata, OplogActions
+from commons.metadata_manager import load_metadata, update_metadata, OplogActions
 from master.namespace_manager import NamespaceManager
 
 
@@ -12,11 +12,11 @@ class Master:
     __slots__ = 'my_addr', 'client_id', 'mutex', \
                 'metadata_file', 'namespace_manager', 'chunk_manager'
 
-    def __init__(self, my_addr):
+    def __init__(self, my_addr, metadata_file):
         self.my_addr = my_addr
         self.client_id = 0  # counter to give next client ID
         self.mutex = threading.Lock()  # TODO: probably use a re entrant lock
-        self.metadata_file = OP_LOG_FILENAME  # File that contains masters metadata
+        self.metadata_file = metadata_file  # File that contains masters metadata
 
         self.namespace_manager = NamespaceManager()
         self.chunk_manager = ChunkManager()
@@ -42,7 +42,7 @@ class Master:
             self.client_id += 1
 
             # make client id persistent in metadata file
-            update_metadata(OplogActions.GRANT_CLIENT_ID, self.client_id)
+            update_metadata(self.metadata_file, OplogActions.GRANT_CLIENT_ID, self.client_id)
 
             return self.client_id
 
@@ -54,6 +54,11 @@ class Master:
         """
         rlog.info("args: path=%s", path)
         res, err = self.namespace_manager.create(path)
+
+        if not err:
+            # Log this operation to oplog
+            update_metadata(self.metadata_file, OplogActions.CREATE_FILE, path)
+
         return res, err
 
     def add_chunk(self, path, chunk_index):
@@ -67,6 +72,10 @@ class Master:
         info, err = self.chunk_manager.add_chunk(path, chunk_index)
         if err:
             return None, None, err
+
+        # Log this operation to oplog
+        update_metadata(self.metadata_file, OplogActions.ADD_CHUNK,
+                        (path, chunk_index, info.chunk_handle, info.chunk_locations, info.chunk_handle))
 
         return info.chunk_handle, info.chunk_locations, None
 
@@ -141,6 +150,9 @@ class Master:
         """Will be called by client to create a dir in the namespace"""
         rlog.info("CREATE DIR API called")
         res, err = self.namespace_manager.create_dir(path)
+        if not err:
+            update_metadata(self.metadata_file, OplogActions.CREATE_DIR, path)
+
         return res, err
 
     def list_allfiles(self, path):
@@ -154,6 +166,10 @@ class Master:
         rlog.info("DELETE FILE API called")
         self.chunk_manager.update_deletechunk_list(path)
         err = self.namespace_manager.delete(path)
+
+        if not err:
+            update_metadata(self.metadata_file, OplogActions.DELETE_FILE, path)
+
         return err
 
     def get_file_length(self, path):
@@ -173,6 +189,9 @@ class Master:
         rlog.info("Received registration request from chunk server at: %s", chunksrv_addr)
         self.chunk_manager.update_chunkserver_list(chunksrv_addr)
 
+        # Log this operation to oplog
+        update_metadata(self.metadata_file, OplogActions.NOTIFY_MASTER, chunksrv_addr)
+
     def heartbeat(self):
         import threading
         bg_thread = threading.Thread(target=self.chunk_manager.beat, args=())
@@ -184,7 +203,7 @@ class Master:
 
 
 def start_master(ip, port):
-    m = Master(f'http://{ip}:{port}')
+    m = Master(f'http://{ip}:{port}', OP_LOG_FILENAME)
 
     # restore previous launch's meta data
     load_metadata(m)

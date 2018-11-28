@@ -2,8 +2,8 @@ import ast
 
 import master.chunk_manager as ch_mgr
 import master.namespace_manager as ns_mgr
+from commons.datastructures import ChunkInfo
 from commons.loggers import default_logger
-from commons.settings import OP_LOG_FILENAME
 
 log = default_logger
 
@@ -11,14 +11,15 @@ SEPARATOR = "|||"
 
 
 class OplogActions:
-    ADD_CHUNK, GRANT_CLIENT_ID, CREATE_FILE, CREATE_DIR, DELETE_FILE, NOTIFY_MASTER = range(6)
+    ADD_CHUNK, GRANT_CLIENT_ID, CREATE_FILE, CREATE_DIR, DELETE_FILE, NOTIFY_MASTER, \
+    REPORT_CHUNK, DEL_BAD_CHUNK = range(8)
 
 
-def update_metadata(action, data):
+def update_metadata(metadata_file, action, data):
     # TODO:
     #  - Maintain meta data as an in memory object
     #  - Find a way to dump entire meta data object
-    with open(OP_LOG_FILENAME, mode="a") as fp:
+    with open(metadata_file, mode="a") as fp:
         fp.write(f"{action}{SEPARATOR}{data}\n")
 
 
@@ -72,14 +73,22 @@ def parse_metadata(m, fp):
             m.chunk_manager.handles[handle] = ch_mgr.PathIndex(path, chunk_index)
             m.chunk_manager.chunk_handle = chunk_handle_counter
 
+        # Chunkserver specific actions
+        elif key == OplogActions.REPORT_CHUNK:
+            path, chunk_handle, chunk_index, length = ast.literal_eval(value)
+            m.chunks[chunk_handle] = ChunkInfo(path, chunk_handle, chunk_index, length)
+
+        elif key == OplogActions.DEL_BAD_CHUNK:
+            del m.chunks[value]
+
         else:
-            log.error('Invalid master meta data key: %s with value: %s', key, value)
+            log.error('Invalid meta data key: %s with value: %s', key, value)
 
 
-def load_metadata(master):
+def load_metadata(server):
     try:
-        with open(master.metadata_file) as fp:
-            parse_metadata(master, fp)
+        with open(server.metadata_file) as fp:
+            parse_metadata(server, fp)
         log.debug("****oplog replay completed****")
     except FileNotFoundError:
-        log.error("Can't open meta data file: %s", master.metadata_file)
+        log.error("Can't open meta data file: %s", server.metadata_file)

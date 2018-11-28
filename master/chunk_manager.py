@@ -5,7 +5,6 @@ import time
 from threading import Lock
 from typing import List, Dict, Set
 
-import master.metadata_manager as meta_mgr
 from commons.errors import FileNotFoundErr, ChunkAlreadyExistsErr, ChunkhandleDoesNotExistErr, NoChunkServerAliveErr, \
     ChunkHandleNotFoundErr
 from commons.loggers import default_logger
@@ -151,10 +150,6 @@ class ChunkManager:
         self.locations[handle] = ChunkInfo(handle, locations)
         self.handles[handle] = PathIndex(path, chunk_index)
 
-        # Log this operation to oplog
-        meta_mgr.update_metadata(meta_mgr.OplogActions.ADD_CHUNK,
-                                 (path, chunk_index, handle, locations, self.chunk_handle))
-
         return self.locations[handle], None
 
     # Find lease holder and return its location.
@@ -254,8 +249,6 @@ class ChunkManager:
 
     def update_chunkserver_list(self, chunksrv_addr):
         self.active_chunk_servers.add(chunksrv_addr)
-        # Log this operation to oplog
-        meta_mgr.update_metadata(meta_mgr.OplogActions.NOTIFY_MASTER, chunksrv_addr)
 
     # // delete all chunk handles related to given path.
     # // and them into delete_chunk[]

@@ -6,6 +6,7 @@ from xmlrpc.server import SimpleXMLRPCServer
 from commons.datastructures import ChunkInfo
 from commons.errors import FileNotFoundErr
 from commons.loggers import request_logger
+from commons.metadata_manager import load_metadata, OplogActions, update_metadata
 from commons.settings import DEFAULT_MASTER_ADDR, DEFAULT_IP, CHUNK_SIZE
 from commons.utils import rpc_call, ensure_dir
 
@@ -18,12 +19,12 @@ class ChunkServer:
     __slots__ = 'my_addr', 'master_addr', 'metadata_file', 'path', 'chunks', 'mutex', \
                 'pending_extensions', 'pendingextensions_lock', 'data', 'data_mutex'
 
-    def __init__(self, my_addr, master_addr, path):
+    def __init__(self, my_addr, master_addr, path, metadata_file):
         self.my_addr = my_addr
         self.master_addr = master_addr
 
         # Filename of a file that contains chunkserver's meta data
-        self.metadata_file = f"chunkserver{my_addr}"
+        self.metadata_file = metadata_file
         self.path = path
         # Store a mapping from handle to information.
         self.chunks = {}
@@ -130,6 +131,12 @@ class ChunkServer:
 
         if offset + length > chunk_info.length:  # chunk size has changed
             chunk_info.length = offset + length
+
+            # log to oplog
+            update_metadata(self.metadata_file, OplogActions.REPORT_CHUNK, (chunk_info.path,
+                                                                            chunk_info.chunk_handle,
+                                                                            chunk_info.chunk_index,
+                                                                            chunk_info.length))
             report_chunk(self, chunk_info)
 
     # // apply_to_secondary is used by the primary replica to apply any modifications
@@ -292,6 +299,7 @@ class ChunkServer:
                     log.info("Deleting Chunk with chunk handle %s", chunk)
                     os.remove(f'{self.path}/{chunk}')
                     del self.chunks[chunk]
+                    update_metadata(self.metadata_file, OplogActions.DEL_BAD_CHUNK, chunk)
                 else:
                     log.error("Unable to delete chunk %s", chunk)
                     return False
@@ -314,7 +322,12 @@ def start_chunkserver(master_addr, my_ip, my_port, path):
     ensure_dir(path)  # make sure this path exists
 
     my_address = f'http://{my_ip}:{my_port}'
-    cs = ChunkServer(my_address, master_addr, path)
+    metadata_filename = f'logs/ck_{my_port}.txt'
+
+    cs = ChunkServer(my_address, master_addr, path, metadata_filename)
+
+    # Load metadata
+    load_metadata(cs)
 
     chunk_server = SimpleXMLRPCServer((my_ip, my_port),
                                       logRequests=True,
