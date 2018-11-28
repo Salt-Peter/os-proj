@@ -235,6 +235,8 @@ class ChunkManager:
 
     def update_chunkserver_list(self, chunksrv_addr):
         self.active_chunk_servers.add(chunksrv_addr)
+        # Log this operation to oplog
+        meta_mgr.update_metadata(meta_mgr.OplogActions.NOTIFY_MASTER, chunksrv_addr)
 
     # // delete all chunk handles related to given path.
     # // and them into delete_chunk[]

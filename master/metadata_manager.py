@@ -11,7 +11,7 @@ SEPARATOR = "|||"
 
 
 class OplogActions:
-    ADD_CHUNK, GRANT_CLIENT_ID, CREATE_FILE, CREATE_DIR, DELETE_FILE = range(5)
+    ADD_CHUNK, GRANT_CLIENT_ID, CREATE_FILE, CREATE_DIR, DELETE_FILE, NOTIFY_MASTER = range(6)
 
 
 def update_metadata(action, data):
@@ -34,6 +34,10 @@ def parse_metadata(m, fp):
         if key == OplogActions.GRANT_CLIENT_ID:
             log.debug("action GRANT_CLIENT_ID")
             m.client_id = int(value)
+
+        elif key == OplogActions.NOTIFY_MASTER:
+            log.debug("action NOTIFY_MASTER")
+            m.chunk_manager.active_chunk_servers.add(value)
 
         elif key == OplogActions.CREATE_FILE:
             log.debug("action CREATE_FILE")
