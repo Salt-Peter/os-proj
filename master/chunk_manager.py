@@ -235,6 +235,23 @@ class ChunkManager:
             #       Need to ensure the there are no duplicates in the array.
             info.chunk_locations.append(address)
 
+    def poll_chunkservers(self):
+        """A one time polling function, runs when master is started to get list of chunks from active chunk servers
+            and update the chunks_of_chunkserver dict."""
+        log.debug("****Polling active chunkservers start***")
+        for chunk_server in self.active_chunk_servers:
+            log.debug("Polling chunkserver %s", chunk_server)
+            cs = rpc_call(chunk_server)
+            try:
+                chunk_handles = cs.get_chunk_handles()
+                # update chunks_of_chunkserver dict
+                self.chunks_of_chunk_server[chunk_server] = chunk_handles
+                log.debug("Polling complete for chunkserver: %s", chunk_server)
+            except ConnectionRefusedError:
+                log.error("Polling failed for chunkserver: %s", chunk_server)
+
+        log.debug("****Polling active chunkservers end***")
+
     def update_chunkserver_list(self, chunksrv_addr):
         self.active_chunk_servers.add(chunksrv_addr)
         # Log this operation to oplog

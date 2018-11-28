@@ -298,6 +298,10 @@ class ChunkServer:
 
         return True  # TODO: should we return success message to master
 
+    def get_chunk_handles(self):
+        """RPC called by master to get list of chunk handles in this server."""
+        return list(self.chunks.keys())
+
 
 def report_chunk(cs, chunk_info):
     ms = rpc_call(cs.master_addr)

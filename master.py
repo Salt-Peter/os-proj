@@ -189,6 +189,9 @@ def start_master(ip, port):
     # restore previous launch's meta data
     load_metadata(m)
 
+    # one time polling to get the list of chunks from each chunk server
+    m.chunk_manager.poll_chunkservers()
+
     # call heartbeat
     m.heartbeat()
 
