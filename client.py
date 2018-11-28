@@ -341,13 +341,16 @@ if __name__ == "__main__":
 
     client.create('a')
     client.write('a', 0, "A man a plan canal panama.")
-    client.write('a', 0, "Alpha Omega")
+    # client.write('a', 0, "Alpha Omega")
     client.read('a', 0, -1, "temp/content")
-
-    append_offset = client.append('a', "l")
-    client.read('a', 0, -1, "temp/content1")
-    print("APPEND OFFSET : ", append_offset)
-    if append_offset == -1:
-        print("Error!!")
+    client.create('b')
+    client.write('b', 0, "OS Project- Google File System.")
+    # client.write('a', 0, "Alpha Omega")
+    client.read('b', 0, -1, "temp/content1")
+    # append_offset = client.append('a', "l")
+    # client.read('a', 0, -1, "temp/content1")
+    # print("APPEND OFFSET : ", append_offset)
+    # if append_offset == -1:
+    #     print("Error!!")
 
     client.delete('a')

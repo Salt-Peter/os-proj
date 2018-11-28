@@ -173,7 +173,8 @@ class Master:
         self.chunk_manager.update_chunkserver_list(chunksrv_addr)
 
     def heartbeat(self):
-        self.chunk_manager.heartbeat()
+        thread = threading.Thread(target=self.chunk_manager.heartbeat_comm(), args=())
+        thread.start()
 
 
 def start_master(ip, port):
@@ -185,6 +186,7 @@ def start_master(ip, port):
     master_server = SimpleXMLRPCServer((ip, port),
                                        logRequests=True,
                                        allow_none=True)
+    m.heartbeat()
 
     # Read: https://gist.github.com/abnvanand/199cacf6c8f45258ff096b842b77b216
     master_server.register_introspection_functions()
@@ -195,10 +197,11 @@ def start_master(ip, port):
     master_server.register_instance(m)
 
     print("Master running at: ", m.my_addr)
+
     master_server.serve_forever()
 
     # TODO: launch background tasks (eg. gc, heartbeat) in a separate thread
-    m.heartbeat()
+
 
 
 if __name__ == '__main__':

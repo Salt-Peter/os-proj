@@ -1,4 +1,5 @@
 import threading
+import os
 from typing import Dict, List
 from xmlrpc.server import SimpleXMLRPCServer
 
@@ -257,6 +258,7 @@ class ChunkServer:
         except FileNotFoundError:
             return FileNotFoundErr
 
+
     def order_chunk_copy_from_peer(self, peer_address, chunk_handle):
         """This RPC is called by master to order a chunkserver to copy some chunks from a peer chunk server
         so as to meet the replication goal for that chunk."""
@@ -284,20 +286,19 @@ class ChunkServer:
         return chunk_info.chunk_index, chunk_info.path, chunk_info.length
 
 
-    # communication with master heartbeat thread
-    def heartbeat_comm(self, msg):
-        chunk_handle_list = []
-        if msg == "Contents?":
-            for chunk_handle in self.chunks.keys():
-                chunk_handle_list.append(chunk_handle)
-            return chunk_handle_list, self.pending_extensions, None
-
     # delete bad chunk
-    def delete_badchunk(self, bad_chunk):
+    def delete_bad_chunk(self, bad_chunk):
         for chunk in bad_chunk:
             if chunk in self.chunks.keys():
-                del self.chunks[chunk]
-        return True, None
+                if os.path.exists(f'{self.path}/{chunk}'):
+                    log.info("Deleting Chunk with chunk handle %s", chunk)
+                    os.remove(f'{self.path}/{chunk}')
+                    del self.chunks[chunk]
+                else:
+                    log.error("Unable to delete chunk %s", chunk)
+                    return False
+
+        return True  # TODO: should we return success message to master
 
 
 

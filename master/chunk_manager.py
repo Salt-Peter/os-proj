@@ -1,5 +1,5 @@
 import random
-import threading
+import threading, socket
 import time
 from threading import Lock
 from typing import List, Dict, Set
@@ -62,11 +62,12 @@ class ChunkManager:
     chunks: Dict[str, Dict[int, Chunk]]
     handles: Dict[int, PathIndex]
     locations: Dict[int, ChunkInfo]
-    chunk_servers: Set[str]
+    active_chunk_servers: Set[str]
     leases: Dict[int, Lease]
     delete_chunk: List[int]
+    chunks_of_chunk_server = Dict[str, List[int]]
 
-    __slots__ = 'lock', 'chunk_handle', 'chunks', 'handles', 'locations', 'chunk_servers', 'leases', 'delete_chunk'
+    __slots__ = 'lock', 'chunk_handle', 'chunks', 'handles', 'locations', 'active_chunk_servers', 'leases', 'delete_chunk'
 
     def __init__(self):
         self.lock = threading.Lock()
@@ -79,7 +80,7 @@ class ChunkManager:
         # chunk handle -> chunk locations (in-memory)
         self.locations = {}
         # a list if chunk servers
-        self.chunk_servers = set()
+        self.active_chunk_servers = set()
         #  chunk handle -> lease
         self.leases = {}
         # a list of chunk handles to be deleted
@@ -140,7 +141,7 @@ class ChunkManager:
         # increment for future
         self.chunk_handle += 1
 
-        locations = pick_randomly(self.chunk_servers, REPLICATION_FACTOR)
+        locations = pick_randomly(self.active_chunk_servers, REPLICATION_FACTOR)
 
         # update our dicts
         self.chunks[path][chunk_index] = Chunk(handle)
@@ -232,7 +233,7 @@ class ChunkManager:
             info.chunk_locations.append(address)
 
     def update_chunkserver_list(self, chunksrv_addr):
-        self.chunk_servers.add(chunksrv_addr)
+        self.active_chunk_servers.add(chunksrv_addr)
 
     # // delete all chunk handles related to given path.
     # // and them into delete_chunk[]
@@ -243,21 +244,59 @@ class ChunkManager:
                 self.delete_chunk.append(int(chunk.chunk_handle))
             del self.chunks[path]
 
-    def heartbeat(self):
-        """This function will create a seperate thread for all
-        chunk servers present in chunkservers list"""
-        thread = threading.Thread(target=heartbeat_comm(),
-                                  args=(self.delete_chunk, self.chunk_servers))
-        thread.start()
+    # def heartbeat(self):
+    #     thread = threading.Thread(target=self.heartbeat_comm(), args=())
+    #     thread.daemon = True
+    #     thread.start()
 
+    def heartbeat_comm(self):
+        log.info("Inside Heartbeat comm")
+        while True:
+            chunk_servers = self.active_chunk_servers  # copy active chunk servers into temp list
+            dead_cs = []
+            for chunk_server_addr in chunk_servers:
+                chunk_server = rpc_call(chunk_server_addr)
+                try:
+                    # try to connect with chunkserver
+                    resp = chunk_server.delete_bad_chunk(self.delete_chunk)
+                    if resp:
+                        log.info("%s has deleted all bad chunks", chunk_server_addr)
+                    else:
+                        log.info("%s is unable to delete all bad chunk handle", chunk_server_addr)
+                except socket.error:
+                    log.info("Unable to connect with %s", chunk_server_addr)
+                    dead_cs.append(chunk_server_addr)
+            if len(dead_cs) > 0:  # delete dead chunk server from active list
+                for cs in dead_cs:
+                    if cs in self.active_chunk_servers:
+                        self.active_chunk_servers.discard(cs)
+                # loop over all chunk handles of dead chunk server
+                for cs in dead_cs:
+                    chunk_handle_list = self.chunks_of_chunk_server.get(cs, None)
+                    if chunk_handle_list:
+                        for chunk_handle in chunk_handle_list:
+                            info = self.locations.get(chunk_handle, None)
+                            if info and info.chunk_locations[cs]:
+                                del info.chunk_locations[cs]
+                                if REPLICATION_FACTOR - len(info.chunk_locations) > 0:
+                                    while True:
+                                        rand_loc = pick_randomly(self.active_chunk_servers, 1)
+                                        if rand_loc not in info.chunk_locations:
+                                            break
+                                    # call order_chunk copy_from_peer
+                                    dest_cs = rand_loc
+                                    peer_address = pick_randomly(info.chunk_locations, 1)
+                                    chunk_server = rpc_call(dest_cs)
+                                    try:
+                                        err = chunk_server.order_chunk_copy_from_peer(peer_address,chunk_handle)
+                                        if err:
+                                            log.info("Unable to replicate to %s due to %s",dest_cs,err)
+                                    except socket.error:
+                                        log.info("Unable to connect to %s for %s replication", dest_cs, chunk_handle)
 
-def heartbeat_comm(delete_chunk, chunk_servers):
-    for chunk_server_addr in chunk_servers:
-        chunk_server = rpc_call(chunk_server_addr)
-
-
-
-
+                    # delete chunk_server from chunks_of_chunk_server_list
+                    self.chunks_of_chunk_server.pop(cs, None)
+            time.sleep(60)
 
 
 log = default_logger
