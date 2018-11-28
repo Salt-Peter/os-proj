@@ -170,11 +170,17 @@ class Master:
         :param chunksrv_addr: http://<ip_addr>:<port>
         :return: None
         """
+        rlog.info("Received registration request from chunk server at: %s", chunksrv_addr)
         self.chunk_manager.update_chunkserver_list(chunksrv_addr)
 
     def heartbeat(self):
-        thread = threading.Thread(target=self.chunk_manager.heartbeat_comm(), args=())
-        thread.start()
+        import threading
+        bg_thread = threading.Thread(target=self.chunk_manager.beat, args=())
+        # Run the thread in daemon mode.
+        # This allows the main application to exit even though the thread is running.
+        # It will also (therefore) make it possible to use ctrl+c to terminate the application.
+        bg_thread.daemon = True
+        bg_thread.start()
 
 
 def start_master(ip, port):
@@ -183,10 +189,12 @@ def start_master(ip, port):
     # restore previous launch's meta data
     load_metadata(m)
 
+    # call heartbeat
+    m.heartbeat()
+
     master_server = SimpleXMLRPCServer((ip, port),
                                        logRequests=True,
                                        allow_none=True)
-    m.heartbeat()
 
     # Read: https://gist.github.com/abnvanand/199cacf6c8f45258ff096b842b77b216
     master_server.register_introspection_functions()
@@ -201,7 +209,6 @@ def start_master(ip, port):
     master_server.serve_forever()
 
     # TODO: launch background tasks (eg. gc, heartbeat) in a separate thread
-
 
 
 if __name__ == '__main__':

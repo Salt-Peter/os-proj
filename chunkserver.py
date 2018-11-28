@@ -1,5 +1,5 @@
-import threading
 import os
+import threading
 from typing import Dict, List
 from xmlrpc.server import SimpleXMLRPCServer
 
@@ -258,7 +258,6 @@ class ChunkServer:
         except FileNotFoundError:
             return FileNotFoundErr
 
-
     def order_chunk_copy_from_peer(self, peer_address, chunk_handle):
         """This RPC is called by master to order a chunkserver to copy some chunks from a peer chunk server
         so as to meet the replication goal for that chunk."""
@@ -285,7 +284,6 @@ class ChunkServer:
         chunk_info = self.chunks.get(chunk_handle, None)
         return chunk_info.chunk_index, chunk_info.path, chunk_info.length
 
-
     # delete bad chunk
     def delete_bad_chunk(self, bad_chunk):
         for chunk in bad_chunk:
@@ -299,7 +297,6 @@ class ChunkServer:
                     return False
 
         return True  # TODO: should we return success message to master
-
 
 
 def report_chunk(cs, chunk_info):

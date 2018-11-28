@@ -1,5 +1,6 @@
 import random
-import threading, socket
+import socket
+import threading
 import time
 from threading import Lock
 from typing import List, Dict, Set
@@ -8,7 +9,7 @@ import master.metadata_manager as meta_mgr
 from commons.errors import FileNotFoundErr, ChunkAlreadyExistsErr, ChunkhandleDoesNotExistErr, NoChunkServerAliveErr, \
     ChunkHandleNotFoundErr
 from commons.loggers import default_logger
-from commons.settings import REPLICATION_FACTOR
+from commons.settings import REPLICATION_FACTOR, HEARTBEAT_INTERVAL
 from commons.utils import pick_randomly, rpc_call
 
 LEASE_TIMEOUT = 60  # expires in 1 minute
@@ -244,14 +245,13 @@ class ChunkManager:
                 self.delete_chunk.append(int(chunk.chunk_handle))
             del self.chunks[path]
 
-    # def heartbeat(self):
-    #     thread = threading.Thread(target=self.heartbeat_comm(), args=())
-    #     thread.daemon = True
-    #     thread.start()
-
-    def heartbeat_comm(self):
-        log.info("Inside Heartbeat comm")
+    def beat(self):
+        # FIXME: Simplify
         while True:
+            import time
+            time.sleep(HEARTBEAT_INTERVAL)
+            log.debug("Heart Beating")
+
             chunk_servers = self.active_chunk_servers  # copy active chunk servers into temp list
             dead_cs = []
             for chunk_server_addr in chunk_servers:
@@ -276,8 +276,8 @@ class ChunkManager:
                     if chunk_handle_list:
                         for chunk_handle in chunk_handle_list:
                             info = self.locations.get(chunk_handle, None)
-                            if info and info.chunk_locations[cs]:
-                                del info.chunk_locations[cs]
+                            if info and cs in info.chunk_locations:
+                                info.chunk_locations.remove(cs)
                                 if REPLICATION_FACTOR - len(info.chunk_locations) > 0:
                                     while True:
                                         rand_loc = pick_randomly(self.active_chunk_servers, 1)
@@ -288,15 +288,14 @@ class ChunkManager:
                                     peer_address = pick_randomly(info.chunk_locations, 1)
                                     chunk_server = rpc_call(dest_cs)
                                     try:
-                                        err = chunk_server.order_chunk_copy_from_peer(peer_address,chunk_handle)
+                                        err = chunk_server.order_chunk_copy_from_peer(peer_address, chunk_handle)
                                         if err:
-                                            log.info("Unable to replicate to %s due to %s",dest_cs,err)
+                                            log.info("Unable to replicate to %s due to %s", dest_cs, err)
                                     except socket.error:
                                         log.info("Unable to connect to %s for %s replication", dest_cs, chunk_handle)
 
                     # delete chunk_server from chunks_of_chunk_server_list
                     self.chunks_of_chunk_server.pop(cs, None)
-            time.sleep(60)
 
 
 log = default_logger
