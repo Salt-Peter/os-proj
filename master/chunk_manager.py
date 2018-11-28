@@ -66,9 +66,10 @@ class ChunkManager:
     active_chunk_servers: Set[str]
     leases: Dict[int, Lease]
     delete_chunk: List[int]
-    chunks_of_chunk_server = Dict[str, List[int]]
+    chunks_of_chunk_server: Dict[str, List[int]]
 
-    __slots__ = 'lock', 'chunk_handle', 'chunks', 'handles', 'locations', 'active_chunk_servers', 'leases', 'delete_chunk'
+    __slots__ = 'lock', 'chunk_handle', 'chunks', 'handles', 'locations', 'active_chunk_servers', \
+                'leases', 'delete_chunk', 'chunks_of_chunk_server'
 
     def __init__(self):
         self.lock = threading.Lock()
@@ -86,13 +87,14 @@ class ChunkManager:
         self.leases = {}
         # a list of chunk handles to be deleted
         self.delete_chunk = []
+        self.chunks_of_chunk_server = {}
 
     def __repr__(self):
         return f""" ChunkManager(chunk_handle={self.chunk_handle},
                                  chunks={self.chunks},
                                  handles={self.handles},
                                  locations={self.locations},
-                                 chunk_servers={self.chunk_servers}
+                                 chunk_servers={self.active_chunk_servers}
                                  leases={self.leases})"""
 
     def find_locations(self, path, chunk_index):
