@@ -257,6 +257,32 @@ class ChunkServer:
         except FileNotFoundError:
             return FileNotFoundErr
 
+    def order_chunk_copy_from_peer(self, peer_address, chunk_handle):
+        """This RPC is called by master to order a chunkserver to copy some chunks from a peer chunk server
+        so as to meet the replication goal for that chunk."""
+        peer_chunk_server = rpc_call(peer_address)
+        # get chunk_info from peer
+        chunk_index, path, length = peer_chunk_server.get_chunk_info_from_peer(chunk_handle)
+        # get chunk's actual data
+        data, err = peer_chunk_server.read(chunk_handle, 0, length)
+        if err:
+            log.error(err)
+            return err
+
+        # write data with that chunk_handle as filename to local filesystem
+        filename = f"{chunk_handle}"
+
+        err = self.apply_write(filename, data.data.decode('utf-8'), 0)
+        if err:
+            return err
+
+        self.report_chunk_info(chunk_handle, chunk_index, path, length, 0)
+
+    def get_chunk_info_from_peer(self, chunk_handle):
+        """Called by a chunkserver for another chunkserver to get a chunk's data"""
+        chunk_info = self.chunks.get(chunk_handle, None)
+        return chunk_info.chunk_index, chunk_info.path, chunk_info.length
+
 
     # communication with master heartbeat thread
     def heartbeat_comm(self, msg):
