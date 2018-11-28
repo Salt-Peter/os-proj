@@ -9,4 +9,4 @@ DEFAULT_IP = "127.0.0.1"
 DEFAULT_MASTER_PORT = 9001
 DEFAULT_MASTER_ADDR = f'http://{DEFAULT_IP}:{DEFAULT_MASTER_PORT}'
 
-OP_LOG_FILENAME = "master_metadata.txt"
+OP_LOG_FILENAME = "logs/master_metadata.txt"
