@@ -226,9 +226,10 @@ class ChunkManager:
                 info = ChunkInfo(chunk_handle, [])
                 self.locations[chunk_handle] = info
 
-            # TODO: Add address into the locations array.
-            #       Need to ensure the there are no duplicates in the array.
-            info.chunk_locations.append(address)
+            # Add address into the locations array.
+            # Need to ensure the there are no duplicates in the array.
+            if address not in info.chunk_locations:
+                info.chunk_locations.append(address)
 
     def poll_chunkservers(self):
         """A one time polling function, runs when master is started to get list of chunks from active chunk servers
