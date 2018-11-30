@@ -230,13 +230,13 @@ class ChunkServer:
             # chunk.
             if chunk_length + length >= CHUNK_SIZE:
                 # TODO error by padding chunk
-                return -1
+                return "error by padding chunk"
 
             # Apply write request to local state, with chunkLength as offset.
             err = self.apply_append(filename, data, chunk_length)
             if err:
                 log.debug("ChunkServer: Append RPC. Lock Released.")
-                return -1
+                return "ChunkServer: Append RPC. Lock Released."
 
             # Update chunkserver metadata.
             self.report_chunk_info(chunk_handle, chunk_index, path, length, chunk_length)
@@ -245,10 +245,11 @@ class ChunkServer:
             err = self.apply_to_secondary(client_id, timestamp, path, chunk_index, chunk_handle, chunk_length,
                                           chunk_locations)
             if err:
-                return -1
+                return "cant Apply append to all secondary replicas"
 
             # TODO chunk lease extension
 
+            print(chunk_length + (chunk_index * CHUNK_SIZE))
             return chunk_length + (chunk_index * CHUNK_SIZE)
 
     def apply_append(self, filename, data, offset):
