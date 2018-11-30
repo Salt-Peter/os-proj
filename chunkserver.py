@@ -40,12 +40,8 @@ class ChunkServer:
         self.data = {}
         self.data_mutex = threading.Lock()
 
-        # tell master about the presence of this chunk server
-        ms = rpc_call(self.master_addr)
-        ms.notify_master(self.my_addr)
-
     # PushData handles client RPC to store data in memory.
-    # Data is identified with a mapping from DataId:[ClientID, Timestamp] -> Data.
+    # Data is identifwrite_helperied with a mapping from DataId:[ClientID, Timestamp] -> Data.
     def push_data(self, client_id, timestamp, data):
         log.debug("me=%s: client_id=%s, timestamp=%s, data=%s", self.my_addr, client_id, timestamp, data)
         with self.data_mutex:
@@ -328,6 +324,12 @@ def start_chunkserver(master_addr, my_ip, my_port, path):
 
     # Load metadata
     load_metadata(cs)
+
+    # tell master about the presence of this chunk server
+    # and also send the list of chunks present here
+    # must do this after loading from oplog
+    ms = rpc_call(cs.master_addr)
+    ms.notify_master(cs.my_addr, list(cs.chunks.keys()))
 
     chunk_server = SimpleXMLRPCServer((my_ip, my_port),
                                       logRequests=True,
