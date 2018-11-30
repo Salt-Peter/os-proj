@@ -2,6 +2,7 @@ import random
 import socket
 import threading
 import time
+from collections import defaultdict
 from threading import Lock
 from typing import List, Dict, Set
 
@@ -57,7 +58,7 @@ class Lease:
 
 
 class ChunkManager:
-    mutex: Lock
+    lock: Lock
     chunk_handle: int
     chunks: Dict[str, Dict[int, Chunk]]
     handles: Dict[int, PathIndex]
@@ -86,7 +87,7 @@ class ChunkManager:
         self.leases = {}
         # a list of chunk handles to be deleted
         self.delete_chunk = []
-        self.chunks_of_chunk_server = {}
+        self.chunks_of_chunk_server = defaultdict(list)
 
     def __repr__(self):
         return f""" ChunkManager(chunk_handle={self.chunk_handle},
@@ -230,6 +231,7 @@ class ChunkManager:
             # Need to ensure the there are no duplicates in the array.
             if address not in info.chunk_locations:
                 info.chunk_locations.append(address)
+            self.chunks_of_chunk_server[address].append(chunk_handle)
 
     def poll_chunkservers(self):
         """A one time polling function, runs when master is started to get list of chunks from active chunk servers
@@ -263,7 +265,6 @@ class ChunkManager:
     def beat(self):
         # FIXME: Simplify
         while True:
-            import time
             time.sleep(HEARTBEAT_INTERVAL)
             log.debug("Heart Beating")
 
@@ -295,12 +296,12 @@ class ChunkManager:
                                 info.chunk_locations.remove(cs)
                                 if REPLICATION_FACTOR - len(info.chunk_locations) > 0:
                                     while True:
-                                        rand_loc = pick_randomly(self.active_chunk_servers, 1)
+                                        rand_loc = pick_randomly(self.active_chunk_servers, 1)[0]
                                         if rand_loc not in info.chunk_locations:
                                             break
                                     # call order_chunk copy_from_peer
                                     dest_cs = rand_loc
-                                    peer_address = pick_randomly(info.chunk_locations, 1)
+                                    peer_address = pick_randomly(info.chunk_locations, 1)[0]
                                     chunk_server = rpc_call(dest_cs)
                                     try:
                                         err = chunk_server.order_chunk_copy_from_peer(peer_address, chunk_handle)
