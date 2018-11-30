@@ -2,9 +2,9 @@ import threading
 from xmlrpc.server import SimpleXMLRPCServer
 
 from commons.loggers import default_logger, request_logger
+from commons.metadata_manager import load_metadata, update_metadata, OplogActions
 from commons.settings import CHUNK_SIZE, DEFAULT_MASTER_PORT, DEFAULT_IP, OP_LOG_FILENAME
 from master.chunk_manager import ChunkManager
-from commons.metadata_manager import load_metadata, update_metadata, OplogActions
 from master.namespace_manager import NamespaceManager
 
 
@@ -178,17 +178,20 @@ class Master:
         file_length, err = self.namespace_manager.get_file_length(path)
         return file_length, err
 
-    def notify_master(self, chunksrv_addr):
+    def notify_master(self, chunksrv_addr, chunk_handles):
         """
         When a chunk server is created,
         it calls this function to notify master of its presence.
         Then master adds this address to its chunkserver list
+        :param chunk_handles: list of chunk handles at that chunk server
         :param chunksrv_addr: http://<ip_addr>:<port>
         :return: None
         """
         rlog.info("Received registration request from chunk server at: %s", chunksrv_addr)
         self.chunk_manager.update_chunkserver_list(chunksrv_addr)
 
+        for chunk_handle in chunk_handles:
+            self.chunk_manager.set_chunk_location(chunk_handle, chunksrv_addr)
         # Log this operation to oplog
         update_metadata(self.metadata_file, OplogActions.NOTIFY_MASTER, chunksrv_addr)
 
