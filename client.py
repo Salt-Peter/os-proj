@@ -326,11 +326,11 @@ class Client:
         return offset
 
 
-    def file_append(client, path, file):
+    def file_append(self, path, file):
         with open(file) as f:
             chunk = f.read(APPEND_SIZE)
             while chunk:
-                client.append(path, chunk)
+                self.append(path, chunk)
                 chunk = f.read(APPEND_SIZE)
 
 
@@ -355,11 +355,12 @@ if __name__ == "__main__":
     client.write('b', 0, "OS Project- Google File System. lorem dfgh")
     # client.write('a', 0, "Alpha Omega")
     client.read('b', 0, -1, "temp/content1")
-    print(client.append('b', "l"))
+    # print(client.append('b', "l"))
+    # client.read('b', 0, -1, "temp/content1")
+    client.file_append( 'b', "temp/content")
+    # print(client.append('b', "l"))
     client.read('b', 0, -1, "temp/content1")
-    for i in range(10):
-        print(client.append('b', "d"))
-        client.read('b', 0, -1, "temp/content1")
+
     # print("APPEND OFFSET : ", append_offset)
     # if append_offset == -1:
     #     print("Error!!")
