@@ -1,5 +1,4 @@
 import random
-import socket
 import threading
 import time
 from collections import defaultdict
@@ -65,11 +64,11 @@ class ChunkManager:
     locations: Dict[int, ChunkInfo]
     active_chunk_servers: Set[str]
     leases: Dict[int, Lease]
-    delete_chunk: List[int]
+    chunks_to_delete: List[int]
     chunks_of_chunk_server: Dict[str, List[int]]
 
     __slots__ = 'lock', 'chunk_handle', 'chunks', 'handles', 'locations', 'active_chunk_servers', \
-                'leases', 'delete_chunk', 'chunks_of_chunk_server'
+                'leases', 'chunks_to_delete', 'chunks_of_chunk_server'
 
     def __init__(self):
         self.lock = threading.Lock()
@@ -86,7 +85,7 @@ class ChunkManager:
         #  chunk handle -> lease
         self.leases = {}
         # a list of chunk handles to be deleted
-        self.delete_chunk = []
+        self.chunks_to_delete = []
         self.chunks_of_chunk_server = defaultdict(list)
 
     def __repr__(self):
@@ -254,64 +253,92 @@ class ChunkManager:
         self.active_chunk_servers.add(chunksrv_addr)
 
     # // delete all chunk handles related to given path.
-    # // and them into delete_chunk[]
+    # // and them into chunks_to_delete[]
     def update_deletechunk_list(self, path):
         chunk_dict = self.chunks.get(path, None)
         if chunk_dict:
             for chunk_index, chunk in chunk_dict.items():
-                self.delete_chunk.append(int(chunk.chunk_handle))
+                self.chunks_to_delete.append(int(chunk.chunk_handle))
             del self.chunks[path]
+
+    def test_connection(self, chunk_server_addr):
+        chunk_server = rpc_call(chunk_server_addr)
+        try:
+            # try to connect with chunkserver
+            resp = chunk_server.delete_bad_chunk(self.chunks_to_delete)
+            if resp:
+                log.info("%s has deleted all bad chunks", chunk_server_addr)
+                return True
+            else:
+                log.info("%s is unable to delete all bad chunk handle", chunk_server_addr)
+                return True
+        except ConnectionRefusedError:
+            log.info("Unable to connect with %s", chunk_server_addr)
+            return False
 
     def beat(self):
         # FIXME: Simplify
         while True:
             time.sleep(HEARTBEAT_INTERVAL)
-            log.debug("Heart Beating")
+            log.debug("Heart Beating %s", self.locations)
+            log.debug("Heart Beating %s", self.active_chunk_servers)
 
-            chunk_servers = self.active_chunk_servers  # copy active chunk servers into temp list
-            dead_cs = []
-            for chunk_server_addr in chunk_servers:
-                chunk_server = rpc_call(chunk_server_addr)
-                try:
-                    # try to connect with chunkserver
-                    resp = chunk_server.delete_bad_chunk(self.delete_chunk)
-                    if resp:
-                        log.info("%s has deleted all bad chunks", chunk_server_addr)
-                    else:
-                        log.info("%s is unable to delete all bad chunk handle", chunk_server_addr)
-                except socket.error:
-                    log.info("Unable to connect with %s", chunk_server_addr)
-                    dead_cs.append(chunk_server_addr)
-            if len(dead_cs) > 0:  # delete dead chunk server from active list
-                for cs in dead_cs:
-                    if cs in self.active_chunk_servers:
-                        self.active_chunk_servers.discard(cs)
-                # loop over all chunk handles of dead chunk server
-                for cs in dead_cs:
-                    chunk_handle_list = self.chunks_of_chunk_server.get(cs, None)
-                    if chunk_handle_list:
-                        for chunk_handle in chunk_handle_list:
-                            info = self.locations.get(chunk_handle, None)
-                            if info and cs in info.chunk_locations:
-                                info.chunk_locations.remove(cs)
-                                if REPLICATION_FACTOR - len(info.chunk_locations) > 0:
-                                    while True:
-                                        rand_loc = pick_randomly(self.active_chunk_servers, 1)[0]
-                                        if rand_loc not in info.chunk_locations:
-                                            break
-                                    # call order_chunk copy_from_peer
+            # build list of dead chunk servers
+            # by testing a connection to them
+            dead_chunk_servers = [cs for cs in self.active_chunk_servers if not self.test_connection(cs)]
+
+            log.debug("Dead chunk servers list = %s", dead_chunk_servers)
+
+            # delete dead chunk server from active chunk servers list
+            self.active_chunk_servers.difference_update(dead_chunk_servers)
+
+            # loop over all chunk handles of dead chunk server
+            for dead_chunk_server in dead_chunk_servers:
+                # get list of chunks that need to be replicated
+                chunk_handles = self.chunks_of_chunk_server.get(dead_chunk_server, [])
+
+                for chunk_handle in chunk_handles:
+                    chunk_info = self.locations.get(chunk_handle, None)
+
+                    if chunk_info and dead_chunk_server in chunk_info.chunk_locations:
+                        # remove dead chunkserver from chunk's chunk_info.chunk_locations
+                        chunk_info.chunk_locations.remove(dead_chunk_server)
+
+                        dest_cs = None
+                        # if replication is needed
+                        # and we have enough number of active chunkservers
+                        # then perform replication
+                        if REPLICATION_FACTOR - len(chunk_info.chunk_locations) > 0 \
+                                and len(
+                            self.active_chunk_servers) >= REPLICATION_FACTOR:  # TODO: Probably handle with semaphore
+
+                            while True:
+                                # keep looping until we pick a chunk server which does not already contain this chunk
+                                # TODO: don't run infinitely, set a fixed max number of times this is executed
+                                rand_loc = pick_randomly(self.active_chunk_servers, 1)[0]
+                                if rand_loc not in chunk_info.chunk_locations:
                                     dest_cs = rand_loc
-                                    peer_address = pick_randomly(info.chunk_locations, 1)[0]
-                                    chunk_server = rpc_call(dest_cs)
-                                    try:
-                                        err = chunk_server.order_chunk_copy_from_peer(peer_address, chunk_handle)
-                                        if err:
-                                            log.info("Unable to replicate to %s due to %s", dest_cs, err)
-                                    except socket.error:
-                                        log.info("Unable to connect to %s for %s replication", dest_cs, chunk_handle)
+                                    break
 
-                    # delete chunk_server from chunks_of_chunk_server_list
-                    self.chunks_of_chunk_server.pop(cs, None)
+                        if not dest_cs:
+                            # if no valid destination chunkserver found, skip this chunks replication
+                            continue
+
+                        # else perform replication
+                        # call order_chunk copy_from_peer
+                        peer_address = pick_randomly(chunk_info.chunk_locations, 1)[0]
+                        cs_proxy = rpc_call(dest_cs)
+
+                        try:
+                            err = cs_proxy.order_chunk_copy_from_peer(peer_address, chunk_handle)
+                            if err:
+                                log.info("Unable to replicate to %s due to %s", dest_cs, err)
+                        except ConnectionRefusedError:
+                            log.info("Unable to connect to %s for %s replication", dest_cs, chunk_handle)
+
+                # delete dead_chunk_server from chunks_of_chunk_server_list
+                # TODO: donot remove if replication was not performed
+                self.chunks_of_chunk_server.pop(dead_chunk_server, None)
 
 
 log = default_logger
