@@ -76,8 +76,9 @@ class Client:
                 return False
 
             start_idx += end_offset - start_offset
+            client_offset = end_chunk_idx *CHUNK_SIZE + end_offset
 
-        return True
+        return True, client_offset
 
     # Returns True if write is successful else false
     def write_helper(self, path, chunk_index, start, end, data):
@@ -352,18 +353,20 @@ if __name__ == "__main__":
     # client.write('a', 0, "Alpha Omega")
     client.read('a', 0, -1, "temp/content")
     client.create('b')
-    client.write('b', 0, "OS Project- Google File System. lorem dfgh")
-    # client.write('a', 0, "Alpha Omega")
+    resp, final_offset = client.write('b', 0, "OS Project- Google File System. lorem dfgh")
     client.read('b', 0, -1, "temp/content1")
+    resp, final_offset = client.write('b', final_offset, "Welcome to Google World.")
+    # client.write('a', 0, "Alpha Omega")
+    client.read('b', 0, -1, "temp/content2")
     # print(client.append('b', "l"))
     # client.read('b', 0, -1, "temp/content1")
-    client.file_append( 'b', "temp/content")
+    # client.file_append( 'b', "temp/content")
     # print(client.append('b', "l"))
-    client.read('b', 0, -1, "temp/content1")
+    # client.read('b', 0, -1, "temp/content1")
 
     # print("APPEND OFFSET : ", append_offset)
     # if append_offset == -1:
     #     print("Error!!")
 
-    client.delete('a')
-    client.delete('b')
+    # client.delete('a')
+    # client.delete('b')
