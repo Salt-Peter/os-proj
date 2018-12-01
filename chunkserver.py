@@ -29,12 +29,6 @@ class ChunkServer:
         # Store a mapping from handle to information.
         self.chunks = {}
         self.mutex = threading.Lock()
-        # Stores pending lease extension requests on chunkhandles.
-        self.pending_extensions = []
-        #  Only used by Hearbeat and ChunkServer.add_chunkextension_request.
-        #  Possible to have ChunkServer.mutex held first, therefore do not acquire
-        #  ChunkServer.mutex after acquire this lock.
-        self.pendingextensions_lock = threading.Lock()
 
         # Stores client's data in memory before commit to disk.
         self.data = {}
@@ -103,7 +97,12 @@ class ChunkServer:
         # Open file that stores the chunk.
         # FIXME: possible bug, 'w' will truncate existing file
         try:
-            with open(f'{self.path}/{filename}', 'w') as fp:  # TODO: create with 0777 perm
+            with open(f'{self.path}/{filename}', 'a') as fp:
+                # creates the file if not exists
+                pass
+
+            # open in r+ mode so that we don't truncate the existing contents and overwrite only by seeking
+            with open(f'{self.path}/{filename}', 'r+') as fp:
                 fp.seek(offset)
                 fp.write(data)
         except FileNotFoundError:
