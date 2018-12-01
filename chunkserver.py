@@ -255,7 +255,7 @@ class ChunkServer:
         # Open file that stores the chunk.
         # FIXME: possible bug, 'w' will truncate existing file
         try:
-            with open(f'{self.path}/{filename}', 'a') as fp:  # TODO: create with 0777 perm
+            with open(f'{self.path}/{filename}', 'ab') as fp:  # TODO: create with 0777 perm
                 fp.seek(offset)
                 fp.write(data)
         except FileNotFoundError:
