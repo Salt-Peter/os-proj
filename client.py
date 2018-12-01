@@ -1,6 +1,6 @@
 import random
 import time
-
+import xmlrpc.client
 from commons.datastructures import DataId
 from commons.errors import ChunkAlreadyExistsErr
 from commons.loggers import default_logger
@@ -323,16 +323,16 @@ class Client:
         offset = primary_cs.append(data_id.client_id, data_id.timestamp,
                                    chunk_handle, chunk_index, path,
                                    chunk_locations)
-        print("offset = ",offset)
+        print("offset = ", offset)
         return offset
 
-
-    def file_append(self, path, file):
+    def write_file(self, path, file):
         with open(file) as f:
-            chunk = f.read(APPEND_SIZE)
+            chunk = f.read(CHUNK_SIZE)
+            write_offset = 0
             while chunk:
-                self.append(path, chunk)
-                chunk = f.read(APPEND_SIZE)
+                resp, write_offset = self.write(path, write_offset, chunk)
+                chunk = f.read(CHUNK_SIZE)
 
 
 if __name__ == "__main__":
@@ -348,16 +348,17 @@ if __name__ == "__main__":
 
     log.info("Client: %s", client)
 
-    client.create('a')
-    client.write('a', 0, "A man a plan canal panama.")
-    # client.write('a', 0, "Alpha Omega")
-    client.read('a', 0, -1, "temp/content")
+    # client.create('a')
+    # client.write('a', 0, "A man a plan canal panama.")
+    # # client.write('a', 0, "Alpha Omega")
+    # client.read('a', 0, -1, "temp/content")
     client.create('b')
-    resp, final_offset = client.write('b', 0, "OS Project- Google File System. lorem dfgh")
+    client.write_file('b', 'input')
+    # resp, final_offset = client.write('b', 0, "OS Project- Google File System. lorem dfgh")
     client.read('b', 0, -1, "temp/content1")
-    resp, final_offset = client.write('b', final_offset, "Welcome to Google World.")
-    # client.write('a', 0, "Alpha Omega")
-    client.read('b', 0, -1, "temp/content2")
+    # resp, final_offset = client.write('b', final_offset, "Welcome to Google World.")
+    # # client.write('a', 0, "Alpha Omega")
+    # client.read('b', 0, -1, "temp/content2")
     # print(client.append('b', "l"))
     # client.read('b', 0, -1, "temp/content1")
     # client.file_append( 'b', "temp/content")
