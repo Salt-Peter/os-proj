@@ -284,7 +284,7 @@ class Client:
         # First check if the size is valid.
         if length > APPEND_SIZE:
             log.error("ERROR: Data size exceeds append limit.")
-            return -1
+            return "size limit exceeded"
 
         # To calculate chunkIndex we must get the length.
         filelength, err = self.getfilelength(path)
@@ -299,8 +299,8 @@ class Client:
         chunk_handle, chunk_locations, err = self.get_chunk_guaranteed(path, chunk_index)
         print("APPEND :: ", chunk_handle, chunk_locations, err)
         if err:
-            return -1
-
+            return "can't get chunk handle location"
+        
         # Construct dataId with clientId and current timestamp.
         data_id = DataId(self.client_id, time.time())
 
@@ -308,22 +308,30 @@ class Client:
         err = self.push_data(chunk_locations, data_id, data)
         if err:
             log.error('Data not pushed to all replicas.')
-            return -1
+            return "Data not pushed to all replicas."
 
         # Once data is pushed to all replicas, send append request to the primary.
         primary = self.find_lease_holder(chunk_handle)
 
         if not primary:
             log.error("Primary chunk server not found.")
-            return -1
+            return "Primary chunk server not found."
 
         # Make Append call to primary chunk server
         primary_cs = rpc_call(primary)
         offset = primary_cs.append(data_id.client_id, data_id.timestamp,
                                    chunk_handle, chunk_index, path,
                                    chunk_locations)
-
+        print("offset = ",offset)
         return offset
+
+
+    def file_append(self, path, file):
+        with open(file) as f:
+            chunk = f.read(APPEND_SIZE)
+            while chunk:
+                self.append(path, chunk)
+                chunk = f.read(APPEND_SIZE)
 
 
 if __name__ == "__main__":
@@ -344,13 +352,18 @@ if __name__ == "__main__":
     # client.write('a', 0, "Alpha Omega")
     client.read('a', 0, -1, "temp/content")
     client.create('b')
-    client.write('b', 0, "OS Project- Google File System.")
+    client.write('b', 0, "OS Project- Google File System. lorem dfgh")
     # client.write('a', 0, "Alpha Omega")
     client.read('b', 0, -1, "temp/content1")
-    # append_offset = client.append('a', "l")
-    # client.read('a', 0, -1, "temp/content1")
+    # print(client.append('b', "l"))
+    # client.read('b', 0, -1, "temp/content1")
+    client.file_append( 'b', "temp/content")
+    # print(client.append('b', "l"))
+    client.read('b', 0, -1, "temp/content1")
+
     # print("APPEND OFFSET : ", append_offset)
     # if append_offset == -1:
     #     print("Error!!")
 
     client.delete('a')
+    client.delete('b')
