@@ -46,7 +46,7 @@ class ChunkServer:
             if value:
                 return
             # else
-            self.data[key] = data
+            self.data[key] = data.data
 
     # Write handles client RPC write requests to the primary chunk. The primary
     # first applies requested write to its local storage, serializes and records
@@ -97,12 +97,12 @@ class ChunkServer:
         # Open file that stores the chunk.
         # FIXME: possible bug, 'w' will truncate existing file
         try:
-            with open(f'{self.path}/{filename}', 'a') as fp:
+            with open(f'{self.path}/{filename}', 'ab') as fp:
                 # creates the file if not exists
                 pass
 
             # open in r+ mode so that we don't truncate the existing contents and overwrite only by seeking
-            with open(f'{self.path}/{filename}', 'r+') as fp:
+            with open(f'{self.path}/{filename}', 'r+b') as fp:
                 fp.seek(offset)
                 fp.write(data)
         except FileNotFoundError:
@@ -276,7 +276,7 @@ class ChunkServer:
         # write data with that chunk_handle as filename to local filesystem
         filename = f"{chunk_handle}"
 
-        err = self.apply_write(filename, data.data.decode('utf-8'), 0)
+        err = self.apply_write(filename, data.data, 0)
         if err:
             return err
 
